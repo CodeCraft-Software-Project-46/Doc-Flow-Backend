@@ -75,9 +75,17 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'docflow',
+        'USER': 'admin',
+        'PASSWORD': 'WRNKb8jj7SZYYSVoOsUG',
+        'HOST': 'docflow.cxqy4m62kusu.eu-north-1.rds.amazonaws.com',
+        'PORT': '3306',
+        'OPTIONS': {
+            'sql_mode': 'STRICT_TRANS_TABLES',
+            'connect_timeout': 10,
+        },
+    },
 }
 
 
