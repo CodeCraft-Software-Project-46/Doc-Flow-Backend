@@ -71,3 +71,18 @@ class SaveRoleView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class GetAllRolesView(APIView):
+    def get(self,request):
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT r.name, r.description, p.permission_id FROM workflows_role r LEFT JOIN role_permissions rp ON r.id = rp.role_id LEFT JOIN permission p ON rp.permission_id = p.permission_id")
+
+                roles=cursor.fetchall()
+                return Response(roles, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
