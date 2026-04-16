@@ -3,6 +3,8 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from .models import UserProfile
+from django.utils.crypto import get_random_string
 
 class LoginSerializer(serializers.Serializer): # Used to receive Data from the Frontend.
     # We expect the frontend to send us a username and password when try to log in, so we define those fields here
@@ -35,3 +37,38 @@ class UserProfileSerializer(serializers.ModelSerializer): # Used to send data to
         model = User
         # These are the exact fields we will send back to React upon a successful login
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'department']
+
+class UserProvisioningSerializer(serializers.Serializer): # used to receive data from the Frontend when creating a new user.
+    full_name = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    role = serializers.CharField(max_length=50) # We will link this to roles tables later
+    department = serializers.CharField(max_length=100, required=False, allow_blank=True)
+
+    def create(self, validated_data):
+        # 1. Split the "Full Name" into First and Last for Django
+        names = validated_data['full_name'].strip().split(' ', 1)
+        first_name = names[0]
+        last_name = names[1] if len(names) > 1 else ''
+
+        # 2. Generate a temporary password (12 characters, secure)
+        temp_password = get_random_string(length=12)
+
+        # 3. Create the User (In enterprise apps, Username is usually the Email)
+        user = User.objects.create_user(
+            username=validated_data['email'], 
+            email=validated_data['email'],
+            password=temp_password,
+            first_name=first_name,
+            last_name=last_name
+        )
+
+        # 4. Create the UserProfile linked to this User
+        UserProfile.objects.create(
+            user=user, 
+            department=validated_data.get('department', '')
+        )
+
+        # We attach the temp password to the user object temporarily 
+        # so our View can read it and send it back to the Admin!
+        user.temp_password = temp_password 
+        return user

@@ -1,4 +1,5 @@
 # Views.py is where we write the logic for handling incoming requests and sending responses back to the frontend.
+# from workflows.models import Role
 
 from rest_framework.views import APIView
 from rest_framework.response import Response # To send data back to React Frontend.
@@ -6,6 +7,9 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated # To check if the user is allowed to use the route.(Valid Token Check)
 from rest_framework_simplejwt.tokens import RefreshToken  # Generate Tokens for User
 from .serializers import LoginSerializer, UserProfileSerializer
+from .serializers import UserProvisioningSerializer
+from .permissions import HasDynamicPermission 
+
 
 
 class LoginView(APIView):
@@ -27,13 +31,25 @@ class LoginView(APIView):
         refresh = RefreshToken.for_user(user)
         access_token = refresh.access_token
         
-        # We can attach the user's role and username directly to the token so 
-        # frontend can read it without making an extra API call to get the user's profile. 
-        # This is optional but can save time and reduce the number of requests.
-        access_token['role'] = user.role.name if user.role else 'No Role'
-        access_token['username'] = user.username
 
-        # 4. Get the Welcome Package (User Profile)
+
+        # 4.1. Find all roles attached to this specific user
+        #user_roles = Role.objects.filter(users=user)
+
+        # 4.2. Extract just the names of the roles into a list: ['Admin', 'Manager']
+        #role_names = list(user_roles.values_list('name', flat=True))
+
+        # 4.3. Extract all unique permissions attached to those roles: ['can_approve', 'can_edit']
+        #permissions_list = list(user_roles.values_list('permissions__name', flat=True).distinct())
+
+        # 4.4. Clean up any empty values just in case a role has no permissions
+        #permissions_list = [p for p in permissions_list if p is not None]
+
+        # 4.5. Pack them securely into the access token
+        access_token['username'] = user.username
+        access_token['roles'] = ['Super Admin']   # = role_names
+        access_token['permissions'] = ['can_view_dashboard']  # = permissions_list
+
         user_data = UserProfileSerializer(user).data
 
         # 5. Deliver it all back to the frontend
@@ -70,3 +86,30 @@ class CurrentUserView(APIView):
     def get(self, request):
         serializer = UserProfileSerializer(request.user)
         return Response(serializer.data)
+    
+
+
+class UserProvisioningView(APIView):
+    # 1. THE LOCK: Only someone with the 'can_add_user' permission can do this!
+    permission_classes = [HasDynamicPermission]
+    required_permission = 'can_add_user'
+
+    def post(self, request):
+        serializer = UserProvisioningSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            # This triggers the create() method in our serializer
+            user = serializer.save() 
+            
+            # We respond with the auto-generated password so the Admin UI can display it
+            return Response({
+                "message": "User created successfully.",
+                "user": {
+                    "email": user.email,
+                    "full_name": f"{user.first_name} {user.last_name}".strip(),
+                    "department": user.profile.department,
+                },
+                "temp_password": user.temp_password 
+            }, status=status.HTTP_201_CREATED)
+            
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
