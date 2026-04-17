@@ -1,6 +1,7 @@
 # Views.py is where we write the logic for handling incoming requests and sending responses back to the frontend.
 # from workflows.models import Role
 
+from audits.utils import log_action
 from rest_framework.views import APIView
 from rest_framework.response import Response # To send data back to React Frontend.
 from rest_framework import status
@@ -21,6 +22,12 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
         
         if not serializer.is_valid():
+            # Log the failed login attempt in the audit log.
+            attempted_username = request.data.get('username', 'Unknown')
+            log_action(
+                action='LOGIN_FAILED',
+                description=f"Failed login attempt for username: {attempted_username}"
+            )
             # Bouncer says no! Return the error to the user.
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -51,6 +58,13 @@ class LoginView(APIView):
         access_token['permissions'] = ['can_view_dashboard']  # = permissions_list
 
         user_data = UserProfileSerializer(user).data
+
+        # Log the successful login in the audit log
+        log_action(
+            action='LOGIN',
+            user=user,
+            description=f"User {user.username} logged in successfully."
+        )
 
         # 5. Deliver it all back to the frontend
         return Response({
