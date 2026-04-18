@@ -1,5 +1,7 @@
 from django.core.mail import send_mail
+from django.contrib.auth import get_user_model
 from .models import NotificationRule, Notification
+User = get_user_model()
 
 def resolve_recipients(recipient_tags):
     # Takes a list of tags (e.g., ["Role: Manager", "User: admin"]) and returns a duplicate-free list of actual User objects.
