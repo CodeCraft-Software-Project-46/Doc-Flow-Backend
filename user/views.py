@@ -1,32 +1,21 @@
-from django.db import connection, transaction
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
 
-from user.utils import generate_role_id
+
+from collections import defaultdict
+from rest_framework.views import APIView
+
 
 
 class GetAllPermissionsView(APIView):
     def get(self, request):
         try:
-       # open database connection - with(after using automatically closed the connection)
+            permissions = Permission.objects.all()
 
-            with connection.cursor() as cursor:
+            grouped_permissions = defaultdict(list)
 
-                cursor.execute("SELECT permission_id, permission_name, category FROM permission")
-                #fetch all data
-                rows = cursor.fetchall()
-
-            grouped_permissions = {} #empty dictionary
-            for row in rows:
-                p_id, p_name, category = row
-
-                if category not in grouped_permissions:
-                    grouped_permissions[category] = []
-
-                grouped_permissions[category].append({
-                    "id": p_id,
-                    "name": p_name
+            for p in permissions:
+                grouped_permissions[p.category].append({
+                    "id": p.permission_id,
+                    "name": p.permission_name
                 })
 
             return Response(grouped_permissions, status=status.HTTP_200_OK)
@@ -34,55 +23,96 @@ class GetAllPermissionsView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+from django.db import transaction
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+
+from .models import Role, Permission, RolePermission
 
 
 class SaveRoleView(APIView):
     def post(self, request):
-        #get inputs
         name = request.data.get('name')
         description = request.data.get('description')
-        permissions = request.data.get('permissions')
+        permissions = request.data.get('permissions', [])
 
         if not name:
-            return Response({"error": "Role name is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Role name is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not isinstance(permissions, list):
+            return Response(
+                {"error": "Permissions must be a list"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             with transaction.atomic():
-                #gerate new id
-                role_id = generate_role_id()
 
-                with connection.cursor() as cursor:
-                    cursor.execute(
-                        "INSERT INTO workflows_role (id, name, description, created_at) VALUES (%s, %s, %s, NOW())",
-                        [role_id, name, description]
+                role = Role.objects.create(
+                    name=name,
+                    description=description
+                )
+
+                permission_objs = list(
+                    Permission.objects.filter(
+                        permission_name__in=permissions
+                    )
+                )
+
+                found_names = {p.permission_name for p in permission_objs}
+
+                missing = set(permissions) - found_names
+                if missing:
+                    return Response(
+                        {
+                            "error": "Invalid permissions found",
+                            "missing": list(missing)
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
                     )
 
-                    if permissions and isinstance(permissions, list):
-                        for p_id in permissions:
-                            cursor.execute(
-                                "INSERT INTO role_permissions (role_id, permission_id) VALUES (%s, %s)",
-                                [role_id, p_id]
-                            )
+                RolePermission.objects.bulk_create([
+                    RolePermission(role=role, permission=p)
+                    for p in permission_objs
+                ])
 
             return Response({
-                "message": "Role and permissions saved successfully!",
-                "role_id": role_id
+                "message": "Role created successfully"
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 class GetAllRolesView(APIView):
-    def get(self,request):
+    def get(self, request):
         try:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT r.name, r.description, p.permission_id FROM workflows_role r LEFT JOIN role_permissions rp ON r.id = rp.role_id LEFT JOIN permission p ON rp.permission_id = p.permission_id")
+            roles = Role.objects.prefetch_related('permissions').all()
 
-                roles=cursor.fetchall()
-                return Response(roles, status=status.HTTP_200_OK)
+            data = []
+
+            for role in roles:
+                data.append({
+                    "id": str(role.id),
+                    "name": role.name,
+                    "description": role.description,
+                    "permissions": list(
+                        role.permissions.values_list(
+                            "permission_name",
+                            flat=True
+                        )
+                    )
+                })
+
+            return Response(data, status=200)
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-
+            return Response(
+                {"error": str(e)},
+                status=500
+            )
