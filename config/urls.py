@@ -14,9 +14,21 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+# from django.contrib import admin
+# from django.urls import path
+
+# urlpatterns = [
+#     path('admin/', admin.site.urls),
+# ]
+
+# path('api/', include('working_hours.urls'))
+# fines API routes for routing
+#When someone calls this URL → run this function
+#“List of routes Django can handle”
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('admin/', admin.site.urls), #Django admin dashboard
+    path('api/working-hours/', include('working_hours.urls')), #working_hours app
 ]
