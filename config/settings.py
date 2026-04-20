@@ -45,6 +45,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -142,3 +143,11 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'BLACKLIST_AFTER_ROTATION': True,
 }
+
+# --- CORS SETTINGS ---
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",    # Standard Vite port
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",    # Just in case you are on port 3000
+    "http://127.0.0.1:3000",
+]
