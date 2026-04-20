@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
+    'django-cors-headers==4.9.0',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
