@@ -78,6 +78,20 @@ class UpdateRoleView(APIView):
 
         return Response(serializer.errors, status=400)
 
+class DeleteRoleView(APIView):
+    def delete(self,request,pk):
+        try:
+            role=Role.objects.get(id=pk)
+        except Role.DoesNotExist:
+            return Response("Role not found", status=404)
+
+        if role.users.exists():
+            return Response("Cannot delete Role assigned to users",400)
+
+        role.delete()
+        return Response("Role deleted successfully", status=200)
+
+
 
 
 
@@ -123,7 +137,6 @@ class DeleteUserView(APIView):
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
 
-        # 🔥 remove lead if needed
         if hasattr(user, "headed_role") and user.headed_role:
             role = user.headed_role
             role.head = None
