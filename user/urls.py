@@ -1,8 +1,15 @@
 from django.urls import path
-from .views import GetAllPermissionsView, SaveRoleView, GetAllRolesView
+from .views import GetAllPermissionsView, SaveRoleView, GetAllRolesView, CreateUserView, CreateDepartmentView, \
+    GetDepartmentsView, UpdateUserView, GetUsersView, DeleteUserView
 
 urlpatterns = [
     path('permissions/', GetAllPermissionsView.as_view(), name='get-permissions'),
     path('save-role/', SaveRoleView.as_view(), name='save-role'),
+    path('save-department/', CreateDepartmentView.as_view(), name='save-department'),
+    path('get-all-departments/', GetDepartmentsView.as_view(), name='get-all-departments'),
     path('get-roles/',GetAllRolesView.as_view(),name='get-roles'),
+    path('save-user/',CreateUserView.as_view(),name='save-user'),
+    path('update-user/<pk>/',UpdateUserView.as_view(),name='update-user'),
+    path('get-users/',GetUsersView.as_view(),name='get-user'),
+    path('delete-user/<uuid:pk>/',DeleteUserView.as_view(),name='delete-user'),
 ]

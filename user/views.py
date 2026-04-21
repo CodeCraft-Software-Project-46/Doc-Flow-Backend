@@ -1,94 +1,40 @@
-
-
+import uuid
 from collections import defaultdict
+
+from rest_framework import status
 from rest_framework.views import APIView
 
+from .serializers import UserSerializer, PermissionSerializer, RoleListSerializer, RoleSerializer, DepartmentSerializer
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
+from .models import Role, Permission, RolePermission, User, Department
 
 
 class GetAllPermissionsView(APIView):
     def get(self, request):
-        try:
-            permissions = Permission.objects.all()
+        permissions = Permission.objects.all()
+        serializer = PermissionSerializer(permissions, many=True)
 
-            grouped_permissions = defaultdict(list)
-
-            for p in permissions:
-                grouped_permissions[p.category].append({
-                    "id": p.permission_id,
-                    "name": p.permission_name
-                })
-
-            return Response(grouped_permissions, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-from django.db import transaction
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-
-from .models import Role, Permission, RolePermission
+        return Response(serializer.data)
 
 
 class SaveRoleView(APIView):
+    def get(self, request):
+        roles = Role.objects.prefetch_related("permissions")
+        serializer = RoleListSerializer(roles, many=True)
+        return Response(serializer.data)
+
     def post(self, request):
-        name = request.data.get('name')
-        description = request.data.get('description')
-        permissions = request.data.get('permissions', [])
+        serializer = RoleSerializer(data=request.data)
 
-        if not name:
-            return Response(
-                {"error": "Role name is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Role created"}, status=201)
 
-        if not isinstance(permissions, list):
-            return Response(
-                {"error": "Permissions must be a list"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        return Response(serializer.errors, status=400)
 
-        try:
-            with transaction.atomic():
 
-                role = Role.objects.create(
-                    name=name,
-                    description=description
-                )
-
-                permission_objs = list(
-                    Permission.objects.filter(
-                        permission_name__in=permissions
-                    )
-                )
-
-                found_names = {p.permission_name for p in permission_objs}
-
-                missing = set(permissions) - found_names
-                if missing:
-                    return Response(
-                        {
-                            "error": "Invalid permissions found",
-                            "missing": list(missing)
-                        },
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-
-                RolePermission.objects.bulk_create([
-                    RolePermission(role=role, permission=p)
-                    for p in permission_objs
-                ])
-
-            return Response({
-                "message": "Role created successfully"
-            }, status=status.HTTP_201_CREATED)
-
-        except Exception as e:
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 class GetAllRolesView(APIView):
     def get(self, request):
         try:
@@ -116,3 +62,83 @@ class GetAllRolesView(APIView):
                 {"error": str(e)},
                 status=500
             )
+
+
+class CreateUserView(APIView):
+    def post(self, request):
+        serializer = UserSerializer(data=request.data)
+
+        if serializer.is_valid():
+            user = serializer.save()
+
+            return Response({
+                "message": "User created",
+                "temporary_password": getattr(user, "temp_password", None)
+            }, status=201)
+
+        return Response(serializer.errors, status=400)
+
+
+class UpdateUserView(APIView):
+    def put(self, request, pk):
+        try:
+            pk = uuid.UUID(pk)  # normalize
+            print("pk ",pk)
+
+            user = User.objects.get(id=pk)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
+
+        serializer = UserSerializer(user, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "User updated successfully"})
+
+        return Response(serializer.errors, status=400)
+
+
+class DeleteUserView(APIView):
+    def delete(self, request, pk):
+        try:
+            user = User.objects.get(id=pk)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=404)
+
+        # 🔥 remove lead if needed
+        if hasattr(user, "headed_role") and user.headed_role:
+            role = user.headed_role
+            role.head = None
+            role.save()
+
+        user.delete()
+
+        return Response({"message": "User deleted successfully"}, status=200)
+
+class GetUsersView(APIView):
+    def get(self, request):
+        users = User.objects.all()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)
+
+class CreateDepartmentView(APIView):
+    def post(self, request):
+        serializer = DepartmentSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message": "Department created successfully"},
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GetDepartmentsView(APIView):
+    def get(self, request):
+        departments = Department.objects.all()
+        serializer = DepartmentSerializer(departments, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
