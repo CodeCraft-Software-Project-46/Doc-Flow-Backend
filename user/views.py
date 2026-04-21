@@ -159,8 +159,7 @@ class CreateDepartmentView(APIView):
         if serializer.is_valid():
             serializer.save()
             return Response(
-                {"message": "Department created successfully"},
-                status=status.HTTP_201_CREATED
+                {"message": "Department created successfully"},201
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -172,4 +171,18 @@ class GetDepartmentsView(APIView):
         serializer = DepartmentSerializer(departments, many=True)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class UpdateDepartmentView(APIView):
+    def put(self, request, pk):
+        try:
+            department = Department.objects.get(id=pk)
+        except Department.DoesNotExist:
+            return Response({"error": "Department not found"}, status=404)
+        serializer = DepartmentSerializer(department, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Department updated successfully"})
+        return Response(serializer.errors, status=400)
+
+
 
