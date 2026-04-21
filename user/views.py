@@ -62,6 +62,24 @@ class GetAllRolesView(APIView):
                 {"error": str(e)},
                 status=500
             )
+class UpdateRoleView(APIView):
+    def put(self,request,pk):
+        try:
+            pk=uuid.UUID(pk)
+            role=Role.objects.get(id=pk)
+
+        except role.DoesNotExist:
+            return Response("Role not found", status=404)
+
+        serializer = RoleSerializer(role, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response("Role updated successfully", status=200)
+
+        return Response(serializer.errors, status=400)
+
+
+
 
 
 class CreateUserView(APIView):

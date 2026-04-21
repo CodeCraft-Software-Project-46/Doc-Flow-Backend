@@ -103,6 +103,24 @@ class RoleSerializer(serializers.ModelSerializer):
         model = Role
         fields = ["id", "name", "description", "permissions"]
 
+    def create(self, validated_data):
+        permissions = validated_data.pop("permissions", [])
+        role = Role.objects.create(**validated_data)
+        role.permissions.set(permissions)
+        return role
+
+    def update(self, instance, validated_data):
+        permissions = validated_data.pop("permissions", None)
+
+        instance.name = validated_data.get("name", instance.name)
+        instance.description = validated_data.get("description", instance.description)
+        instance.save()
+
+        if permissions is not None:
+            instance.permissions.set(permissions)
+
+        return instance
+
 class RoleListSerializer(serializers.ModelSerializer):
     permissions = serializers.StringRelatedField(many=True)
 
