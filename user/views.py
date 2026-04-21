@@ -184,5 +184,18 @@ class UpdateDepartmentView(APIView):
             return Response({"message": "Department updated successfully"})
         return Response(serializer.errors, status=400)
 
+class DeleteDepartmentView(APIView):
+    def delete(self, request, pk):
+        try:
+            department = Department.objects.get(id=pk)
+        except Department.DoesNotExist:
+            return Response({"error": "Department not found"}, status=404)
+        if department.users.exists():
+            return Response("Cannot delete Department. Users have assigned to it",400)
+        department.delete()
+        return Response({"message": "Department deleted successfully"}, status=200)
+
+
+
 
 
