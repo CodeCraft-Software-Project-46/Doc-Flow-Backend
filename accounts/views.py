@@ -10,7 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken  # Generate Tokens for 
 from .serializers import LoginSerializer, UserProfileSerializer
 from .serializers import UserProvisioningSerializer
 from .permissions import HasDynamicPermission 
-
+from django.db import connection
 
 
 class LoginView(APIView):
@@ -40,22 +40,40 @@ class LoginView(APIView):
         
 
 
-        # 4.1. Find all roles attached to this specific user
-        #user_roles = Role.objects.filter(users=user)
+       
 
-        # 4.2. Extract just the names of the roles into a list: ['Admin', 'Manager']
-        #role_names = list(user_roles.values_list('name', flat=True))
+        try:
+            with connection.cursor() as cursor:
+                # 1. Fetch the Role and Permissions directly from SQL
+                # This query finds the role name and all 24 permission names at once
+                query = """
+                    SELECT ur.name, up.permission_name
+                    FROM user_user uu
+                    JOIN user_role ur ON uu.role_id = ur.id
+                    JOIN user_rolepermission urp ON ur.id = urp.role_id
+                    JOIN user_permission up ON urp.permission_id = up.permission_id
+                    WHERE uu.username = %s
+                """
+                cursor.execute(query, [user.username])
+                rows = cursor.fetchall()
 
-        # 4.3. Extract all unique permissions attached to those roles: ['can_approve', 'can_edit']
-        #permissions_list = list(user_roles.values_list('permissions__name', flat=True).distinct())
+                if rows:
+                    role_name = rows[0][0]
+                    permissions_list = [row[1] for row in rows]
+                    
+                    access_token['roles'] = [role_name]
+                    access_token['permissions'] = permissions_list
+                else:
+                    # If the query returned nothing
+                    access_token['roles'] = ['Guest']
+                    access_token['permissions'] = ['can_view_dashboard']
 
-        # 4.4. Clean up any empty values just in case a role has no permissions
-        #permissions_list = [p for p in permissions_list if p is not None]
+            access_token['username'] = user.username
 
-        # 4.5. Pack them securely into the access token
-        access_token['username'] = user.username
-        access_token['roles'] = ['Super Admin']   # = role_names
-        access_token['permissions'] = ['can_view_dashboard']  # = permissions_list
+        except Exception as e:
+            print(f"Direct SQL Error: {e}")
+            access_token['roles'] = ['Guest']
+            access_token['permissions'] = ['can_view_dashboard']
 
         user_data = UserProfileSerializer(user).data
 
