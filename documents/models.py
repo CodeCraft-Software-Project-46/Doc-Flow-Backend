@@ -3,10 +3,7 @@ from django.contrib.auth.models import User
 import uuid
 
 class DocumentType(models.Model):
-    """
-    Defines the types of documents allowed in the system.
-    Example: Invoice, Purchase Order, Bill of Lading.
-    """
+#  Tabble to categorize documents (e.g., Invoice, Contract, Report)
     type_name = models.CharField(max_length=100)
     category = models.CharField(max_length=100)
     allowed_extensions = models.CharField(max_length=200, default='pdf,jpg,png,tiff')
@@ -20,10 +17,7 @@ class DocumentType(models.Model):
         db_table = 'document_types'
 
 class Document(models.Model):
-    """
-    The core model representing a single document entity.
-    This tracks the status and source of the file.
-    """
+  # Main table to store document metadata and track workflow status
     STATUS_CHOICES = [
         ('uploaded', 'Uploaded'),
         ('in_workflow', 'In Workflow'),
@@ -34,7 +28,7 @@ class Document(models.Model):
 
     SOURCE_CHOICES = [
         ('manual', 'Manual Upload'),
-        ('onedrive', 'OneDrive CSV'),
+        ('onedrive', 'OneDrive Document'),
     ]
 
     # Using UUID for primary key is safer for distributed systems
@@ -76,9 +70,8 @@ class Document(models.Model):
         ordering = ['-submitted_date']
 
 class ManualUploadDocument(models.Model):
-    """
-    Metadata specific to files uploaded manually through the UI.
-    """
+   # imported documents from manual uploads. 
+   # This allows us to track the source and file details separately from OneDrive imports.
     document = models.OneToOneField(
         Document,
         on_delete=models.CASCADE,
@@ -94,9 +87,8 @@ class ManualUploadDocument(models.Model):
         db_table = 'manual_upload_documents'
 
 class OneDriveDocument(models.Model):
-    """
-    Metadata specific to files synced from Microsoft OneDrive.
-    """
+    #imported documents from OneDrive. 
+    # This allows us to track the source and sync status separately from manual uploads.
     document = models.OneToOneField(
         Document,
         on_delete=models.CASCADE,
@@ -112,9 +104,7 @@ class OneDriveDocument(models.Model):
         db_table = 'onedrive_documents'
 
 class DocumentVersion(models.Model):
-    """
-    Tracks historical versions of the same document.
-    """
+   # This table tracks different versions of a document
     document = models.ForeignKey(
         Document,
         on_delete=models.CASCADE,
@@ -134,11 +124,8 @@ class DocumentVersion(models.Model):
         db_table = 'document_versions'
         ordering = ['-version_number']
 
-class CSVImportLog(models.Model):
-    """
-    Logs every attempt to import a CSV from OneDrive.
-    Useful for debugging background sync jobs.
-    """
+class OneDriveSyncLog(models.Model):
+   # This table logs the synchronization process with OneDrive, including successes and failures.
     STATUS_CHOICES = [
         ('success', 'Success'),
         ('failed', 'Failed'),
@@ -155,5 +142,5 @@ class CSVImportLog(models.Model):
     imported_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'csv_import_logs'
+        db_table = 'OneDrive_import_logs'
         ordering = ['-imported_at']
