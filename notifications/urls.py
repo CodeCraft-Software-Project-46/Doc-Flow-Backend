@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import NotificationRuleListView, UserInboxView
+from .views import NotificationRuleListView, UserInboxView, NotificationRuleDetailView, RecipientOptionsView
 
 urlpatterns = [
     # API for the Admin Dashboard
@@ -7,4 +7,8 @@ urlpatterns = [
     
     # API for the User's Sidebar Bell
     path('inbox/', UserInboxView.as_view(), name='notification-inbox'),
+
+    path('rules/<int:pk>/', NotificationRuleDetailView.as_view()), # For toggle/delete
+
+    path('recipient-options/', RecipientOptionsView.as_view()),      # For the dropdown
 ]
