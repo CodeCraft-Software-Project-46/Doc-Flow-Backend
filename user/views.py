@@ -175,6 +175,7 @@ class GetDepartmentsView(APIView):
 class UpdateDepartmentView(APIView):
     def put(self, request, pk):
         try:
+            pk = uuid.UUID(pk)  # normalize
             department = Department.objects.get(id=pk)
         except Department.DoesNotExist:
             return Response({"error": "Department not found"}, status=404)
