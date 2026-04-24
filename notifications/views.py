@@ -113,3 +113,29 @@ class RecipientOptionsView(views.APIView):
             "roles": [f"Role: {r}" for r in roles],
             "users": [f"User: {u}" for u in users]
         })
+
+class MarkNotificationReadView(views.APIView):
+    """
+    PATCH /api/notifications/inbox/<id>/read/
+    Marks a single notification as read.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            # Security: Ensure the user can only mark THEIR OWN notifications as read
+            notification = Notification.objects.get(pk=pk, user=request.user)
+            notification.is_read = True
+            notification.save()
+
+            # Audit the reading action
+            log_action(
+                action='NOTIFICATION_READ',
+                user=request.user,
+                request=request,
+                description=f"Marked notification '{notification.title}' as read"
+            )
+
+            return response.Response({"status": "success"})
+        except Notification.DoesNotExist:
+            return response.Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)

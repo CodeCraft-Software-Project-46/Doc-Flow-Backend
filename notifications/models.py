@@ -44,12 +44,31 @@ class Notification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
     title = models.CharField(max_length=255)
     message = models.TextField()
+
+    # This helps React decide which icon to show (Bell, Warning, Checkmark)
+    event_type = models.CharField(
+        max_length=50, 
+        choices=NotificationRule.EVENT_CHOICES, 
+        null=True, 
+        blank=True
+    )
+
+    # Used to color-code the notification (Blue for Info, Red for Breach)
+    LEVEL_CHOICES = [
+        ('INFO', 'Information'),
+        ('SUCCESS', 'Success'),
+        ('WARNING', 'Warning'),
+        ('ERROR', 'Critical/Breach'),
+    ]
+
+    level = models.CharField(max_length=10, choices=LEVEL_CHOICES, default='INFO')
     related_record_id = models.IntegerField(null=True, blank=True)
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-created_at']
+        db_table = 'notifications_inbox'
 
     def __str__(self):
         read_status = "READ" if self.is_read else "UNREAD"
