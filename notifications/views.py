@@ -1,6 +1,7 @@
 from rest_framework import generics, views, response, status
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.models import User
+from audits.utils import log_action
 
 # Corrected Imports: Pull from your local models and the workflows app
 from .models import NotificationRule, Notification
@@ -21,8 +22,15 @@ class NotificationRuleListView(generics.ListCreateAPIView):
     required_permission = 'can_manage_notifications'
 
     def perform_create(self, serializer):
-        # Automatically stamp the rule with the person who created it [cite: 364, 411]
-        serializer.save(created_by=self.request.user)
+        # 1. Capture the instance being saved
+        instance = serializer.save(created_by=self.request.user)
+        # 2. Log the creation action.
+        log_action(
+            action='NOTIFICATION_RULE_CREATED',
+            user=self.request.user,
+            request=self.request,
+            description=f"New Notification Rule Created: {instance.name}" # Note: use 'name' as per your model
+        )
 
 
 class UserInboxView(generics.ListAPIView):
@@ -45,6 +53,48 @@ class NotificationRuleDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = NotificationRuleSerializer
     permission_classes = [HasDynamicPermission]
     required_permission = 'can_manage_notifications'
+
+    def perform_update(self, serializer):
+        # 1. Get the current rule before the changes are saved
+        old_instance = self.get_object()
+        old_status = old_instance.is_active
+        
+        # 2. Save the new changes
+        instance = serializer.save()
+        
+        # 3. Check: Did the user flip the 'active' switch, or just edit text?
+        if old_status != instance.is_active:
+            # It was a toggle (Enable/Disable)
+            log_action(
+                action='NOTIFICATION_RULE_TOGGLED',
+                user=self.request.user,
+                request=self.request,
+                previous_state="Enabled" if old_status else "Disabled",
+                new_state="Enabled" if instance.is_active else "Disabled",
+                description=f"Notification Rule '{instance.name}' status changed."
+            )
+        else:
+            # It was a regular edit (changed name, channel, etc.)
+            log_action(
+                action='NOTIFICATION_RULE_UPDATED',
+                user=self.request.user,
+                request=self.request,
+                description=f"Notification Rule Edited: {instance.name}"
+            )
+
+    def perform_destroy(self, instance):
+        # 4. Capture the name BEFORE the row is deleted from the DB
+        rule_name = instance.name
+        
+        log_action(
+            action='NOTIFICATION_RULE_DELETED',
+            user=self.request.user,
+            request=self.request,
+            description=f"Notification Rule Deleted: {rule_name}"
+        )
+        
+        # 5. Now actually delete the record
+        instance.delete()
 
 
 class RecipientOptionsView(views.APIView):

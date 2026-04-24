@@ -6,18 +6,19 @@ class NotificationRule(models.Model):
     # Stores dynamic notification triggers. Accessible by ANY user role that possesses the 'can_manage_notifications' permission.
 
     EVENT_CHOICES = [
-        ('TASK_ASSIGNED', 'Task Assigned'), # Left is for DB, right is for display
+        ('TASK_ASSIGNED', 'Task Assigned'),
         ('SLA_REMINDER', 'SLA Reminder'),
         ('SLA_BREACH', 'SLA Breach'),
         ('WORKFLOW_COMPLETED', 'Workflow Completed'),
         ('TASK_REJECTED', 'Task Rejected'),
         ('DOCUMENT_UPLOADED', 'Document Uploaded'),
         ('COMMENT_ADDED', 'Comment Added'),
+        ('DOCUMENT_APPROVED', 'Document Approved'),
     ]
 
     CHANNEL_CHOICES = [
         ('EMAIL', 'Email Only'),
-        ('IN_APP', 'In-App Only'),
+        ('IN_APP_ONLY', 'In-App Only'), 
         ('BOTH', 'Email + In-App'),
     ]
 

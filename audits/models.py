@@ -13,6 +13,10 @@ class AuditLog(models.Model):
         ('COMMENT_ADDED', 'Comment Added'),
         ('NOTIFICATION_VIEWED', 'Notifications Viewed'),
         ('NOTIFICATION_READ', 'Notification Marked Read'),
+        ('NOTIFICATION_RULE_CREATED', 'New Notification Rule Created'),
+        ('NOTIFICATION_RULE_UPDATED', 'Notification Rule Edited'),
+        ('NOTIFICATION_RULE_DELETED', 'Notification Rule Deleted'),
+        ('NOTIFICATION_RULE_TOGGLED', 'Notification Rule Enabled/Disabled'),
     ]
     # We allow null/blank for user because some actions (like failed login attempts) might not be associated with a valid user account
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_logs')
