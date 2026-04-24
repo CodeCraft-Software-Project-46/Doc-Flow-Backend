@@ -1,6 +1,8 @@
 from django.urls import path
-from .views import ManualUploadView
+from .views import ManualUploadView, WorkflowDropdownListView, FolderMappingView
 
 urlpatterns = [ # Define URL patterns for the documents app, linking to the appropriate views   
     path('upload/manual/', ManualUploadView.as_view(), name='manual-upload'),
+    path('workflows/', WorkflowDropdownListView.as_view(), name='workflow-list'),
+    path('mappings/', FolderMappingView.as_view(), name='folder-mapping'),
 ]

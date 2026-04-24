@@ -144,3 +144,41 @@ class OneDriveSyncLog(models.Model):
     class Meta:
         db_table = 'OneDrive_import_logs'
         ordering = ['-imported_at']
+
+class OneDriveFolderMapping(models.Model):
+    # The name the user types in your React frontend (e.g., "Purchase Requests")
+    folder_name = models.CharField(max_length=255, unique=True)
+    
+    # The actual ID Microsoft generates when your backend creates the folder
+    onedrive_folder_id = models.CharField(max_length=255, null=True, blank=True) 
+    
+    # Matches the ID in your teammate's 'workflows_workflow' table
+    workflow_id = models.IntegerField() 
+    
+    # We store the name so your frontend can easily display it in a table 
+    # without having to do complex database joins every time
+    workflow_name = models.CharField(max_length=255) 
+    
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.folder_name} mapped to {self.workflow_name}"
+
+    class Meta:
+        db_table = 'onedrive_folder_mappings'
+
+class ExternalWorkflow(models.Model):
+    """
+    An unmanaged proxy model to read from Awishka's workflows_workflow table.
+    Django will NOT try to run migrations on this table.
+    """
+    # Django automatically assumes there is an 'id' primary key, so we don't need to write it.
+    name = models.CharField(max_length=255) 
+    description = models.TextField(null=True, blank=True)
+    status = models.CharField(max_length=50) # Extremely useful for filtering
+    
+    class Meta:
+        managed = False # CRITICAL: Keeps your migrations isolated from Awishka's
+        db_table = 'workflows_workflow'

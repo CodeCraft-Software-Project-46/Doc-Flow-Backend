@@ -32,8 +32,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
-    'documents', # your app
-    'django_celery_beat',
+    'documents', # my app
+    'django_celery_beat',  # For periodic tasks scheduling
+    'django_celery_results'  # To store Celery task results in the database
 ]
 
 MIDDLEWARE = [
@@ -137,10 +138,9 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 # OneDrive / Azure credentials
-AZURE_TENANT_ID = os.getenv('AZURE_TENANT_ID')
-AZURE_CLIENT_ID = os.getenv('AZURE_CLIENT_ID')
-AZURE_CLIENT_SECRET = os.getenv('AZURE_CLIENT_SECRET')
-ONEDRIVE_WATCH_FOLDER = os.getenv('ONEDRIVE_WATCH_FOLDER', 'Documents/Incoming')
+MS_TENANT_ID = os.getenv('MS_TENANT_ID')
+MS_CLIENT_ID = os.getenv('MS_CLIENT_ID')
+MS_CLIENT_SECRET = os.getenv('MS_CLIENT_SECRET')
 
 # REST Framework
 REST_FRAMEWORK = {
@@ -151,3 +151,25 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
+# --- CELERY CONFIGURATION ---
+
+# 1. Grab your existing AWS MySQL credentials from the DATABASES dictionary
+DB_USER = DATABASES['default']['USER']
+DB_PASSWORD = DATABASES['default']['PASSWORD']
+DB_HOST = DATABASES['default']['HOST']
+DB_PORT = DATABASES['default']['PORT']
+DB_NAME = DATABASES['default']['NAME']
+
+# 2. Tell Celery to use AWS MySQL as the Message Broker
+CELERY_BROKER_URL = f"sqla+mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+# 3. Tell Celery to use Django's database as the Result Backend
+CELERY_RESULT_BACKEND = 'django-db'
+
+# 4. Standard settings
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Asia/Colombo'
+
