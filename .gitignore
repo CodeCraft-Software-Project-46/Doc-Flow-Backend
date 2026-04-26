@@ -38,3 +38,6 @@ build/
 
 # PyCharm
 *.iml
+
+# Credentials and secrets
+google_credentials.json

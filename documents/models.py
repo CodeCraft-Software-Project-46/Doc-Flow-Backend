@@ -28,7 +28,7 @@ class Document(models.Model):
 
     SOURCE_CHOICES = [
         ('manual', 'Manual Upload'),
-        ('onedrive', 'OneDrive Document'),
+        ('gdrive', 'Google Drive Document'),
     ]
 
     # Using UUID for primary key is safer for distributed systems
@@ -71,7 +71,7 @@ class Document(models.Model):
 
 class ManualUploadDocument(models.Model):
    # imported documents from manual uploads. 
-   # This allows us to track the source and file details separately from OneDrive imports.
+   # This allows us to track the source and file details separately from GDrive imports.
     document = models.OneToOneField(
         Document,
         on_delete=models.CASCADE,
@@ -86,22 +86,21 @@ class ManualUploadDocument(models.Model):
     class Meta:
         db_table = 'manual_upload_documents'
 
-class OneDriveDocument(models.Model):
-    #imported documents from OneDrive. 
-    # This allows us to track the source and sync status separately from manual uploads.
+class GoogleDriveDocument(models.Model):
+    #imported documents from Google Drive. 
     document = models.OneToOneField(
         Document,
         on_delete=models.CASCADE,
-        related_name='onedrive_doc'
+        related_name='gdrive_doc'
     )
-    one_drive_file_id = models.CharField(max_length=255)
+    gdrive_file_id = models.CharField(max_length=255)
     drive_url = models.URLField(max_length=500, blank=True)
     file_name = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     synced_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        db_table = 'onedrive_documents'
+        db_table = 'gdrive_documents'
 
 class DocumentVersion(models.Model):
    # This table tracks different versions of a document
@@ -124,8 +123,8 @@ class DocumentVersion(models.Model):
         db_table = 'document_versions'
         ordering = ['-version_number']
 
-class OneDriveSyncLog(models.Model):
-   # This table logs the synchronization process with OneDrive, including successes and failures.
+class GoogleDriveSyncLog(models.Model):
+   # This table logs the synchronization process with Google Drive, including successes and failures.
     STATUS_CHOICES = [
         ('success', 'Success'),
         ('failed', 'Failed'),
@@ -142,15 +141,15 @@ class OneDriveSyncLog(models.Model):
     imported_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'OneDrive_import_logs'
+        db_table = 'gdrive_import_logs'
         ordering = ['-imported_at']
 
-class OneDriveFolderMapping(models.Model):
+class GDriveFolderMapping(models.Model):
     # The name the user types in your React frontend (e.g., "Purchase Requests")
     folder_name = models.CharField(max_length=255, unique=True)
     
     # The actual ID Microsoft generates when your backend creates the folder
-    onedrive_folder_id = models.CharField(max_length=255, null=True, blank=True) 
+    gdrive_folder_id = models.CharField(max_length=255, null=True, blank=True) 
     
     # Matches the ID in your teammate's 'workflows_workflow' table
     workflow_id = models.IntegerField() 
@@ -167,7 +166,7 @@ class OneDriveFolderMapping(models.Model):
         return f"{self.folder_name} mapped to {self.workflow_name}"
 
     class Meta:
-        db_table = 'onedrive_folder_mappings'
+        db_table = 'gdrive_folder_mappings'
 
 class ExternalWorkflow(models.Model):
     """

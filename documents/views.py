@@ -4,9 +4,12 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import Document, DocumentType, ManualUploadDocument
 from rest_framework.permissions import AllowAny
-from .models import OneDriveFolderMapping, ExternalWorkflow
-from .onedrive_service import OneDriveService
+from .models import GDriveFolderMapping, ExternalWorkflow
+from .gdrive_service import GDriveService
 from rest_framework.permissions import AllowAny
+from rest_framework import status
+
+
 
 class ManualUploadView(APIView): # This view handles manual document uploads, ensuring no duplicates and proper metadata storage
     parser_classes = (MultiPartParser, FormParser) # Allow handling of file uploads and form data
@@ -83,17 +86,17 @@ class WorkflowDropdownListView(APIView):
         
 class FolderMappingView(APIView):
     permission_classes = [AllowAny]
-    """Handles creating folders in OneDrive and mapping them to workflows"""
+    """Handles creating folders in Google Drive and mapping them to workflows"""
     
     def get(self, request):
         """List all existing mappings for the frontend table"""
-        mappings = OneDriveFolderMapping.objects.all().values(
+        mappings = GDriveFolderMapping.objects.all().values(
             'id', 'folder_name', 'workflow_name', 'is_active'
         )
         return Response(mappings, status=200)
 
     def post(self, request):
-        """Create a new folder in OneDrive and map it"""
+        """Create a new folder in Google Drive and map it"""
         folder_name = request.data.get('folder_name')
         workflow_id = request.data.get('workflow_id')
         workflow_name = request.data.get('workflow_name')
@@ -101,17 +104,17 @@ class FolderMappingView(APIView):
         if not folder_name or not workflow_id:
             return Response({"error": "Folder name and workflow are required"}, status=400)
 
-        # 1. Call Microsoft Graph API to physically create the folder
+        # 1. Call Google Drive API to physically create the folder
         try:
-            service = OneDriveService()
-            onedrive_id = service.create_folder(folder_name)
+            service = GDriveService()
+            gdrive_id = service.create_folder(folder_name)
         except Exception as e:
-            return Response({"error": f"Failed to create folder in Microsoft: {str(e)}"}, status=500)
+            return Response({"error": f"Failed to create folder in Google Drive: {str(e)}"}, status=500)
 
         # 2. Save the mapping in your AWS MySQL database
-        mapping = OneDriveFolderMapping.objects.create(
+        mapping = GDriveFolderMapping.objects.create(
             folder_name=folder_name,
-            onedrive_folder_id=onedrive_id,
+            gdrive_folder_id=gdrive_id,
             workflow_id=workflow_id,
             workflow_name=workflow_name
         )
@@ -120,3 +123,53 @@ class FolderMappingView(APIView):
             "message": "Folder created and mapped successfully!",
             "mapping_id": mapping.id
         }, status=201)
+    
+
+class CreateFolderMappingView(APIView):
+    """
+    API endpoint to dynamically create a Google Drive folder 
+    and map it to a workflow in the database.
+    """
+    permission_classes = [AllowAny]
+    def post(self, request):
+        folder_name = request.data.get('folder_name')
+        workflow_id = request.data.get('workflow_id')
+        workflow_name = request.data.get('workflow_name', 'Unnamed Workflow')
+
+        # Basic validation
+        if not folder_name or not workflow_id:
+            return Response(
+                {"error": "Please provide both 'folder_name' and 'workflow_id'."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 1. PASTE YOUR MASTER PARENT FOLDER ID HERE
+        PARENT_FOLDER_ID = "1qWRHEans-FRu41gBtaKiP5E29kFk0nEX"
+
+        try:
+            # 2. Initialize Google Drive Engine
+            drive_service = GDriveService()
+            
+            # 3. Ask Google to create the physical folder inside your Master folder
+            gdrive_folder_id = drive_service.create_folder(
+                folder_name=folder_name, 
+                parent_folder_id=PARENT_FOLDER_ID
+            )
+
+            # 4. Save the new mapping to AWS MySQL
+            mapping = GDriveFolderMapping.objects.create(
+                folder_name=folder_name,
+                gdrive_folder_id=gdrive_folder_id,
+                workflow_id=workflow_id,
+                workflow_name=workflow_name,
+                is_active=True
+            )
+
+            return Response({
+                "message": f"Successfully created and mapped folder: {folder_name}",
+                "gdrive_folder_id": gdrive_folder_id,
+                "workflow_id": workflow_id
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

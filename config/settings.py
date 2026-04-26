@@ -1,4 +1,5 @@
 from pathlib import Path
+from celery.schedules import crontab
 
 import os
 from dotenv import load_dotenv
@@ -137,11 +138,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
 ]
 
-# OneDrive / Azure credentials
-MS_TENANT_ID = os.getenv('MS_TENANT_ID')
-MS_CLIENT_ID = os.getenv('MS_CLIENT_ID')
-MS_CLIENT_SECRET = os.getenv('MS_CLIENT_SECRET')
-
 # REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -173,3 +169,14 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Colombo'
 
+# --- CELERY BEAT SCHEDULE ---
+CELERY_BEAT_SCHEDULE = {
+    'scan-google-drive-every-minute': {
+        # This must match the exact path to your task!
+        'task': 'documents.tasks.scan_all_mapped_folders', 
+        
+        # Run every 60 seconds (Great for testing)
+        'schedule': 10.0, 
+        
+    },
+}
