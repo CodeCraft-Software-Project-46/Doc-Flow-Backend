@@ -41,3 +41,9 @@ build/
 
 # Credentials and secrets
 google_credentials.json
+
+# Celery Beat Schedule Files
+celerybeat-schedule
+celerybeat-schedule.db
+celerybeat-schedule-wal
+celerybeat-schedule-shm
