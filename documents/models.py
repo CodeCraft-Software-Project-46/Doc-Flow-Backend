@@ -152,7 +152,7 @@ class GDriveFolderMapping(models.Model):
     gdrive_folder_id = models.CharField(max_length=255, null=True, blank=True) 
     
     # Matches the ID in your teammate's 'workflows_workflow' table
-    workflow_id = models.IntegerField() 
+    workflow_id = models.CharField(max_length=255)
     
     # We store the name so your frontend can easily display it in a table 
     # without having to do complex database joins every time
@@ -181,3 +181,30 @@ class ExternalWorkflow(models.Model):
     class Meta:
         managed = False # CRITICAL: Keeps your migrations isolated from Awishka's
         db_table = 'workflows_workflow'
+
+
+class ExternalWorkflowInstance(models.Model):
+    """
+    An unmanaged proxy model to insert live workflows into Awishka's engine.
+    """
+    # Awishka uses UUIDs for his instance IDs
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    document_name = models.CharField(max_length=255)
+    document_type = models.CharField(max_length=100)
+    status = models.CharField(max_length=50)
+    current_state = models.CharField(max_length=50)
+    payload = models.TextField()
+    runtime_state = models.TextField()
+    
+    # Notice this is a CharField because Awishka is using UUID strings for workflows!
+    workflow_id = models.CharField(max_length=255) 
+
+    started_at = models.DateTimeField()
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+
+    class Meta:
+        managed = False # CRITICAL: Keeps your migrations safe
+        db_table = 'workflows_workflowinstance'
+    
