@@ -34,6 +34,7 @@ class Document(models.Model):
     # Using UUID for primary key is safer for distributed systems
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     document_name = models.CharField(max_length=255)
+    s3_url = models.URLField(max_length=500, blank=True, null=True)
     document_type = models.ForeignKey(
         DocumentType,
         on_delete=models.SET_NULL,

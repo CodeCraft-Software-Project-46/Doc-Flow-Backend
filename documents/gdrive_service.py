@@ -59,3 +59,20 @@ class GDriveService:
             fields='id, parents'
         ).execute()
         return file.get('id')
+    
+    def trash_file(self, file_id):
+        """
+        Moves the processed file to the Google Drive Trash.
+        It will automatically be permanently deleted by Google after 30 days.
+        """
+        try:
+            print(f"Moving file {file_id} to Google Drive Trash...")
+            self.service.files().update(
+                fileId=file_id, 
+                body={'trashed': True}
+            ).execute()
+            print("Successfully trashed original file.")
+        except Exception as e:
+            print(f"❌ Failed to trash file {file_id}: {str(e)}")
+            # We don't raise the error here because the file is already safe in AWS S3. 
+            # We just log it so the worker doesn't crash over a cleanup task.
