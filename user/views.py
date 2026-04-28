@@ -63,12 +63,12 @@ class GetAllRolesView(APIView):
                 status=500
             )
 class UpdateRoleView(APIView):
-    def put(self,request,pk):
+    def put(self, request, pk):
         try:
-            pk=uuid.UUID(pk)
-            role=Role.objects.get(id=pk)
+            pk = uuid.UUID(pk)
+            role = Role.objects.get(id=pk)
 
-        except role.DoesNotExist:
+        except Role.DoesNotExist:
             return Response("Role not found", status=404)
 
         serializer = RoleSerializer(role, data=request.data)
@@ -77,23 +77,23 @@ class UpdateRoleView(APIView):
             return Response("Role updated successfully", status=200)
 
         return Response(serializer.errors, status=400)
-
 class DeleteRoleView(APIView):
-    def delete(self,request,pk):
+    def delete(self, request, pk):
         try:
-            role=Role.objects.get(id=pk)
+            pk = uuid.UUID(pk)
+            role = Role.objects.get(id=pk)
         except Role.DoesNotExist:
-            return Response("Role not found", status=404)
+            return Response({"message": "Role not found"}, status=404)
 
-        if role.users.exists():
-            return Response("Cannot delete Role assigned to users",400)
+        # If user is assigned, remove role from user
+        if hasattr(role, "user") and role.user:
+            user = role.user
+            user.role = None
+            user.save()
 
         role.delete()
-        return Response("Role deleted successfully", status=200)
 
-
-
-
+        return Response({"message": "Role deleted successfully"}, status=200)
 
 
 class CreateUserView(APIView):
@@ -114,9 +114,7 @@ class CreateUserView(APIView):
 class UpdateUserView(APIView):
     def put(self, request, pk):
         try:
-            pk = uuid.UUID(pk)  # normalize
-            print("pk ",pk)
-
+            pk = uuid.UUID(pk)
             user = User.objects.get(id=pk)
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
@@ -136,11 +134,6 @@ class DeleteUserView(APIView):
             user = User.objects.get(id=pk)
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
-
-        if hasattr(user, "headed_role") and user.headed_role:
-            role = user.headed_role
-            role.head = None
-            role.save()
 
         user.delete()
 
@@ -170,7 +163,11 @@ class GetDepartmentsView(APIView):
         departments = Department.objects.all()
         serializer = DepartmentSerializer(departments, many=True)
 
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.data)
+
+
+
+
 
 class UpdateDepartmentView(APIView):
     def put(self, request, pk):
