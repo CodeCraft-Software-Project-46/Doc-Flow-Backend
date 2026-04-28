@@ -2,14 +2,17 @@ import hashlib
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
-from .models import Document, DocumentType, ManualUploadDocument
+from .models import Document, DocumentType, ManualUploadDocument, ExternalWorkflow
 from rest_framework.permissions import AllowAny
 from .models import GDriveFolderMapping, ExternalWorkflow
 from .gdrive_service import GDriveService
 from rest_framework.permissions import AllowAny
 from rest_framework import status
+
 import json
 from django.utils import timezone
+
+from rest_framework.decorators import api_view, permission_classes
 
 from documents.models import Document, DocumentType, ManualUploadDocument, ExternalWorkflowInstance
 from documents.s3_service import S3Service
@@ -219,3 +222,27 @@ class CreateFolderMappingView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_upload_dropdowns(request):
+    """
+    Fetches the active Document Types and Workflows to populate the React frontend dropdowns.
+    """
+    try:
+        # 1. Fetch Document Types (only the active ones)
+        # We use .values() to only grab the ID and Name to keep the payload tiny and fast
+        doc_types = DocumentType.objects.filter(is_active=True).values('id', 'type_name')
+        
+        # 2. Fetch Workflows from Awishka's table via your proxy model
+        # Assuming his active workflows have a status like 'Published', 'Active', or similar. 
+        # If he doesn't use status, just remove the .filter() and use .all()
+        workflows = ExternalWorkflow.objects.all().values('id', 'name')
+        
+        return Response({
+            "document_types": list(doc_types),
+            "workflows": list(workflows)
+        }, status=200)
+        
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
