@@ -8,19 +8,27 @@ from .models import GDriveFolderMapping, ExternalWorkflow
 from .gdrive_service import GDriveService
 from rest_framework.permissions import AllowAny
 from rest_framework import status
+import json
+from django.utils import timezone
+
+from documents.models import Document, DocumentType, ManualUploadDocument, ExternalWorkflowInstance
+from documents.s3_service import S3Service
+from documents.ai_service import DocumentAIService
 
 
 
-class ManualUploadView(APIView): # This view handles manual document uploads, ensuring no duplicates and proper metadata storage
-    parser_classes = (MultiPartParser, FormParser) # Allow handling of file uploads and form data
+
+class ManualUploadView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
     permission_classes = [AllowAny]
     
-    def post(self, request, *args, **kwargs): #triggered when a POST request is made to this endpoint
-        file_obj = request.FILES.get('file') # Get the uploaded file from the request
-        doc_type_id = request.data.get('document_type_id') # Get the document type ID from the form data
+    def post(self, request, *args, **kwargs):
+        file_obj = request.FILES.get('file')
+        doc_type_id = request.data.get('document_type_id')
+        workflow_id = request.data.get('workflow_id') # <-- NEW: The UI needs to send this!
         
-        if not file_obj:
-            return Response({"error": "No file provided"}, status=400)
+        if not file_obj or not doc_type_id or not workflow_id:
+            return Response({"error": "File, document_type_id, and workflow_id are required."}, status=400)
 
         # 1. Calculate SHA-256 Hash to prevent duplicates
         sha256_hash = hashlib.sha256()
@@ -28,7 +36,7 @@ class ManualUploadView(APIView): # This view handles manual document uploads, en
             sha256_hash.update(chunk)
         file_hash = sha256_hash.hexdigest()
 
-        # Reset file pointer after hashing so it can be saved properly
+        # Reset file pointer after hashing
         file_obj.seek(0)
 
         # 2. Duplicate Check
@@ -39,31 +47,69 @@ class ManualUploadView(APIView): # This view handles manual document uploads, en
         try:
             doc_type = DocumentType.objects.get(id=doc_type_id)
             
+            # --- NEW: Spin up the Engines ---
+            file_content = file_obj.read()
+            mime_type = file_obj.content_type
+            file_name = file_obj.name
+
+            s3_service = S3Service()
+            ai_service = DocumentAIService()
+
+            # Upload to AWS S3 & Summarize
+            s3_url = s3_service.upload_file_bytes(file_content, file_name, mime_type)
+            summary_text = ai_service.generate_summary(file_content, mime_type)
+            # --------------------------------
+
             # Create core Document
             new_doc = Document.objects.create(
-                document_name=file_obj.name,
+                document_name=file_name,
                 document_type=doc_type,
                 source='manual',
-                file_hash=file_hash
+                file_hash=file_hash,
+                ai_summary=summary_text, # <-- Saved!
+                s3_url=s3_url            # <-- Saved!
             )
             
             # Create Manual Metadata
+            file_obj.seek(0) # Reset pointer again just in case Django's FileField needs it
             ManualUploadDocument.objects.create(
                 document=new_doc,
                 file=file_obj,
-                original_filename=file_obj.name,
+                original_filename=file_name,
                 file_size=file_obj.size,
-                mime_type=file_obj.content_type
+                mime_type=mime_type
             )
+
+            # --- NEW: THE HANDSHAKE ---
+            ExternalWorkflowInstance.objects.create(
+                workflow_id=str(workflow_id),  
+                document_name=new_doc.document_name,
+                document_type=doc_type.type_name, 
+                status='RUNNING', 
+                current_state='Start',
+                created_at=timezone.now(), 
+                updated_at=timezone.now(), 
+                started_at=timezone.now(), 
+                payload=json.dumps({
+                    "document_id": str(new_doc.id),
+                    "source": "Manual Upload",
+                    "ai_summary": summary_text
+                }),
+                runtime_state="{}"
+            )
+            # --------------------------
             
             return Response({
-                "message": "Upload successful", 
-                "document_id": new_doc.id
+                "message": "Upload successful, secured in S3, and workflow triggered!", 
+                "document_id": new_doc.id,
+                "s3_url": s3_url
             }, status=201)
             
         except DocumentType.DoesNotExist:
             return Response({"error": "Invalid Document Type selected"}, status=400)
-        
+        except Exception as e:
+            # Catching generic exceptions ensures a crashed S3 upload doesn't just return a blank 500 page
+            return Response({"error": str(e)}, status=500)   
 
 
 class WorkflowDropdownListView(APIView):
