@@ -2,23 +2,18 @@ import hashlib
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
-from .models import Document, DocumentType, ManualUploadDocument, ExternalWorkflow
+from .models import Document, DocumentType, ManualUploadDocument, ExternalWorkflow, ExternalWorkflowInstance
 from rest_framework.permissions import AllowAny
 from .models import GDriveFolderMapping, ExternalWorkflow
 from .gdrive_service import GDriveService
 from rest_framework.permissions import AllowAny
-from rest_framework import status
-
+from rest_framework import status, generics
+from .serializers import DocumentTypeSerializer, DocumentSerializer
 import json
 from django.utils import timezone
-
 from rest_framework.decorators import api_view, permission_classes
-
-from documents.models import Document, DocumentType, ManualUploadDocument, ExternalWorkflowInstance
-from documents.s3_service import S3Service
-from documents.ai_service import DocumentAIService
-
-
+from .s3_service import S3Service
+from .ai_service import DocumentAIService
 
 
 class ManualUploadView(APIView):
@@ -114,7 +109,6 @@ class ManualUploadView(APIView):
             # Catching generic exceptions ensures a crashed S3 upload doesn't just return a blank 500 page
             return Response({"error": str(e)}, status=500)   
 
-
 class WorkflowDropdownListView(APIView):
     permission_classes = [AllowAny]
     """Fetches available workflows from the AWS database for the frontend dropdown"""
@@ -173,7 +167,6 @@ class FolderMappingView(APIView):
             "mapping_id": mapping.id
         }, status=201)
     
-
 class CreateFolderMappingView(APIView):
     """
     API endpoint to dynamically create a Google Drive folder 
@@ -223,6 +216,23 @@ class CreateFolderMappingView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
+class DocumentTypeListCreateView(generics.ListCreateAPIView):
+    """
+    GET: Returns a list of all document types.
+    POST: Creates a new document type.
+    """
+    permission_classes = [AllowAny]
+    queryset = DocumentType.objects.all().order_by('-created_at')
+    serializer_class = DocumentTypeSerializer
+
+class DocumentListView(generics.ListAPIView):
+    """
+    GET: Returns a list of all processed documents (Manual & GDrive).
+    """
+    permission_classes = [AllowAny] 
+    queryset = Document.objects.all().order_by('-submitted_date') # Newest files first
+    serializer_class = DocumentSerializer
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_upload_dropdowns(request):
@@ -246,3 +256,5 @@ def get_upload_dropdowns(request):
         
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
+

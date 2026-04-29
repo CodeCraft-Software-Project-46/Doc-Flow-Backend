@@ -9,5 +9,7 @@ urlpatterns = [ # Define URL patterns for the documents app, linking to the appr
     path('mappings/', FolderMappingView.as_view(), name='folder-mapping'),
     path('mappings/create/', CreateFolderMappingView.as_view(), name='create-folder-mapping'),
     path('upload/dropdowns/', views.get_upload_dropdowns, name='upload-dropdowns'),
+    path('types/', views.DocumentTypeListCreateView.as_view(), name='document-type-list-create'),
+    path('list/', views.DocumentListView.as_view(), name='document-list'),
 
 ]

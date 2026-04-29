@@ -1,10 +1,10 @@
 from rest_framework import serializers
-from .models import Document, DocumentType, ManualUploadDocument #import my specific database tables (models) from the current directory
+from .models import Document, DocumentType #import my specific database tables (models) from the current directory
 
 class DocumentTypeSerializer(serializers.ModelSerializer): # Send data from the DocumentType table to the frontend.
     class Meta:
         model = DocumentType     #which of my database tables now use
-        fields = ['id', 'type_name', 'category', 'allowed_extensions']  #which seleccted fields from the DocumentType table to send to the frontend. 
+        fields = ['id', 'type_name', 'category', 'allowed_extensions', 'is_active']  #which seleccted fields from the DocumentType table to send to the frontend. 
 
 class DocumentSerializer(serializers.ModelSerializer): # Send data from the Document table to the frontend. 
     # This reads the string name of the document type to send to the frontend
@@ -13,5 +13,4 @@ class DocumentSerializer(serializers.ModelSerializer): # Send data from the Docu
     
     class Meta:
         model = Document
-        fields = ['id', 'document_name', 'document_type', 'document_type_name', 'current_status', 'submitted_date', 'file_hash']
-        # This specifies which fields from the Document table to send to the frontend, including the related document type name.    
+        fields = ['id', 'document_name', 'document_type', 'document_type_name', 'source', 'current_status', 'submitted_date', 'file_hash', 'ai_summary', 's3_url', 'updated_at']        # This specifies which fields from the Document table to send to the frontend, including the related document type name.    
