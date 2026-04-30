@@ -102,7 +102,6 @@ class UserSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         temp_password = get_random_string(10)
-
         user = User(**validated_data)
         user.set_password(temp_password)
         user.save()

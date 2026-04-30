@@ -1,14 +1,13 @@
 import uuid
-from collections import defaultdict
 
 from rest_framework import status
-from rest_framework.views import APIView
 
 from .serializers import UserSerializer, PermissionSerializer, RoleListSerializer, RoleSerializer, DepartmentSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from .models import Role, Permission, RolePermission, User, Department
+from .models import Role, Permission, User, Department
+from .utils import send_user_credentials
 
 
 class GetAllPermissionsView(APIView):
@@ -103,6 +102,7 @@ class CreateUserView(APIView):
         if serializer.is_valid():
             user = serializer.save()
 
+            send_user_credentials(user,user.temp_password)
             return Response({
                 "message": "User created",
                 "temporary_password": getattr(user, "temp_password", None)
