@@ -14,6 +14,7 @@ from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from .s3_service import S3Service
 from .ai_service import DocumentAIService
+  
 
 
 class ManualUploadView(APIView):
@@ -232,6 +233,11 @@ class DocumentListView(generics.ListAPIView):
     permission_classes = [AllowAny] 
     queryset = Document.objects.all().order_by('-submitted_date') # Newest files first
     serializer_class = DocumentSerializer
+
+class DocumentTypeDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [AllowAny]  # Disable authentication for this view
+    queryset = DocumentType.objects.all()
+    serializer_class = DocumentTypeSerializer
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

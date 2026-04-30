@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import ManualUploadView, WorkflowDropdownListView, FolderMappingView, CreateFolderMappingView
+from .views import DocumentTypeDetailView, ManualUploadView, WorkflowDropdownListView, FolderMappingView, CreateFolderMappingView
 from . import views
 
 
@@ -11,5 +11,7 @@ urlpatterns = [ # Define URL patterns for the documents app, linking to the appr
     path('upload/dropdowns/', views.get_upload_dropdowns, name='upload-dropdowns'),
     path('types/', views.DocumentTypeListCreateView.as_view(), name='document-type-list-create'),
     path('list/', views.DocumentListView.as_view(), name='document-list'),
+    path('types/<int:pk>/', DocumentTypeDetailView.as_view(), name='document-type-detail'),
+
 
 ]
