@@ -1,0 +1,62 @@
+from django.db import models
+
+class User(models.Model):
+    user_id = models.AutoField(primary_key=True)
+    user_name = models.CharField(max_length=255)
+    department_id = models.IntegerField()
+    role_id = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = "analytics_user"    #Django will NOT create or modify tables You're using an existing database
+
+class Workflow(models.Model):
+    workflow_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+    created_at = models.DateTimeField()
+    definition = models.TextField()
+
+    class Meta:
+        managed = False
+        db_table = "analytics_workflow"
+
+class WorkflowInstance(models.Model):
+    instance_id = models.AutoField(primary_key=True)
+    workflow_id = models.IntegerField(db_column="workflow_id")
+    instance_name = models.CharField(max_length=255)  
+    created_at = models.DateTimeField()
+    document_id = models.IntegerField(blank=True, null=True)
+    status = models.CharField(max_length=50)
+    completed_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "analytics_workflow_instance"
+
+
+class TaskInstance(models.Model):
+    task_id = models.AutoField(primary_key=True)
+
+    workflow_instance = models.ForeignKey(
+        WorkflowInstance,
+        on_delete=models.DO_NOTHING,
+        db_column="workflow_instance_id",
+        related_name="tasks"
+    )
+
+    task_name = models.CharField(max_length=255, null=True)
+
+    created_at = models.DateTimeField()
+    status = models.CharField(max_length=50)
+    due_at = models.DateTimeField()
+
+    assigned_role_id = models.IntegerField(null=True)
+
+    sla_hours = models.IntegerField()
+    completed_at = models.DateTimeField(null=True)
+
+    sla_status = models.CharField(max_length=50, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "analytics_task_instance"

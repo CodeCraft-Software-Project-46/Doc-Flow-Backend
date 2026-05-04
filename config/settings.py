@@ -44,6 +44,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'working_hours',
     'chatbot',
+    'analytics',
+    'sla_engine',
 ]
 
 MIDDLEWARE = [

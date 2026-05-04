@@ -32,4 +32,5 @@ urlpatterns = [
     path('admin/', admin.site.urls), #Django admin dashboard
     path('api/working-hours/', include('working_hours.urls')), #working_hours app
     path("api/chatbot/", include("chatbot.urls")), #chatbot app
+    path("api/analytics/", include("analytics.urls")), #analytics app
 ]
