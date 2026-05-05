@@ -17,6 +17,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_decode
+from django.contrib.auth import update_session_auth_hash
 
 class LoginView(APIView):
     # Anyone can try to log in, so no permission checks yet
@@ -206,3 +207,32 @@ class PasswordResetConfirmView(APIView):
                 
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             return Response({"error": "Invalid request."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated] # Must be logged in[cite: 5]
+
+    def post(self, request):
+        user = request.user
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+
+        # 1. Security Check: Verify old password
+        if not user.check_password(old_password):
+            return Response({"error": "Incorrect current password."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Update auth_user[cite: 6]
+        user.set_password(new_password)
+        user.save()
+
+        # 3. Important: Keep the session alive after password change
+        update_session_auth_hash(request, user)
+
+        # 4. Audit Log[cite: 2]
+        log_action(
+            action='ACTION_TAKEN', 
+            user=user, 
+            description="User manually changed their password from the dashboard."
+        )
+
+        return Response({"message": "Password updated successfully!"})

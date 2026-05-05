@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import LoginView, LogoutView, CurrentUserView, UserProvisioningView, PasswordResetRequestView, PasswordResetConfirmView
+from .views import ChangePasswordView, LoginView, LogoutView, CurrentUserView, UserProvisioningView, PasswordResetRequestView, PasswordResetConfirmView
 
 urlpatterns = [
     path('provision-user/', UserProvisioningView.as_view(), name='provision-user'),
@@ -8,6 +8,7 @@ urlpatterns = [
     path('me/', CurrentUserView.as_view(), name='current-user'),
     path('password-reset/', PasswordResetRequestView.as_view(), name='password_reset_request'),
     path('password-reset-confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    path('change-password/', ChangePasswordView.as_view(), name='change_password'),
 ]
 
 # We wrote as classes. The .as_view() method converts them into functions that can handle HTTP requests.
