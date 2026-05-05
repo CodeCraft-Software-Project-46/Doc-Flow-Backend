@@ -11,7 +11,12 @@ from .serializers import LoginSerializer, UserProfileSerializer
 from .serializers import UserProvisioningSerializer
 from .permissions import HasDynamicPermission 
 from django.db import connection
-
+from django.core.mail import send_mail
+from django.contrib.auth.models import User
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_decode
 
 class LoginView(APIView):
     # Anyone can try to log in, so no permission checks yet
@@ -44,27 +49,23 @@ class LoginView(APIView):
 
         try:
             with connection.cursor() as cursor:
-                # 1. Fetch the Role and Permissions directly from SQL
-                # This query finds the role name and all 24 permission names at once
+                # Direct query using the custom user_user table
                 query = """
-                    SELECT ur.name, up.permission_name
-                    FROM user_user uu
+                    SELECT ur.name as role_name, up.permission_name
+                    FROM auth_user au
+                    JOIN user_user uu ON au.id = uu.id
                     JOIN user_role ur ON uu.role_id = ur.id
                     JOIN user_rolepermission urp ON ur.id = urp.role_id
                     JOIN user_permission up ON urp.permission_id = up.permission_id
-                    WHERE uu.username = %s
+                    WHERE au.username = %s
                 """
                 cursor.execute(query, [user.username])
                 rows = cursor.fetchall()
 
                 if rows:
-                    role_name = rows[0][0]
-                    permissions_list = [row[1] for row in rows]
-                    
-                    access_token['roles'] = [role_name]
-                    access_token['permissions'] = permissions_list
+                    access_token['roles'] = [rows[0][0]] # Role Name
+                    access_token['permissions'] = list(set([row[1] for row in rows])) # Unique Permissions
                 else:
-                    # If the query returned nothing
                     access_token['roles'] = ['Guest']
                     access_token['permissions'] = ['can_view_dashboard']
 
@@ -145,3 +146,63 @@ class UserProvisioningView(APIView):
             }, status=status.HTTP_201_CREATED)
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetRequestView(APIView):
+    permission_classes = []  # Publicly accessible
+
+    def post(self, request):
+        email = request.data.get('email')
+        user = User.objects.filter(email=email).first()
+        
+        if user:
+            # 1. Generate Token and UID
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            
+            # 2. Build the React Frontend Link
+            # Note: Point this to your React domain, not the Django API
+            reset_link = f"http://localhost:5173/reset-password/{uid}/{token}/"
+            
+            # 3. Send the Email using existing settings[cite: 3]
+            send_mail(
+                subject="DocFlow Password Reset",
+                message=f"Click the link to reset your password: {reset_link}",
+                from_email=None,  # Uses DEFAULT_FROM_EMAIL from settings.py
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+            
+            # 4. Log the action[cite: 2]
+            log_action(action='PASSWORD_RESET_REQUESTED', user=user, description=f"Reset link sent to {email}")
+
+        # Always return 200 to prevent user enumeration
+        return Response({"message": "If an account exists with this email, a reset link has been sent."}, status=status.HTTP_200_OK)
+    
+class PasswordResetConfirmView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        uidb64 = request.data.get('uid')
+        token = request.data.get('token')
+        new_password = request.data.get('new_password')
+
+        try:
+            # 1. Decode UID to find the user
+            uid = urlsafe_base64_decode(uidb64).decode()
+            user = User.objects.get(pk=uid)
+            
+            # 2. Validate the token
+            if default_token_generator.check_token(user, token):
+                # 3. Update auth_user password
+                user.set_password(new_password)
+                user.save()
+                
+                # 4. Log successful reset[cite: 2]
+                log_action(action='PASSWORD_RESET_SUCCESS', user=user, description="User successfully reset their password.")
+                return Response({"message": "Password has been reset successfully."}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST)
+                
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response({"error": "Invalid request."}, status=status.HTTP_400_BAD_REQUEST)

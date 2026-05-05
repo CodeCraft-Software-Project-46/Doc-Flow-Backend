@@ -8,4 +8,5 @@ urlpatterns = [
     path('api/auth/', include('accounts.urls')), # This tells Django: "Any URL that starts with /api/auth/, go look inside accounts.urls to find the rest!"
     path('api/audits/', include('audits.urls')),
     path('api/notifications/', include('notifications.urls')),
+    path('api/documents/', include('documents.urls')),
 ]
