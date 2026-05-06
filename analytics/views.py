@@ -17,7 +17,7 @@ from analytics.services.workflow_widgets import WorkflowWidgets
 
 class RunningDocumentsView(APIView):
     def get(self, request):
-        return Response({"value": get_running_documents()})
+        return Response(get_running_documents())
 
 #Your class inherits from APIView which gives 
 class ActiveOverdueTasksView(APIView):   #self means current object refernce      #this class inherits from APIView → becomes a view that can handle API requests

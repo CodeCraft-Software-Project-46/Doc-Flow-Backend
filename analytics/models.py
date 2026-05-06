@@ -1,5 +1,21 @@
 from django.db import models
 
+class Department(models.Model):
+    department_id = models.AutoField(primary_key=True)
+    department_name = models.CharField(max_length=255)
+
+    class Meta:
+        managed = False
+        db_table = "analytics_department"
+
+class Role(models.Model):
+    role_id = models.AutoField(primary_key=True)
+    role_name = models.CharField(max_length=255)
+
+    class Meta:
+        managed = False
+        db_table = "analytics_role"
+
 class User(models.Model):
     user_id = models.AutoField(primary_key=True)
     user_name = models.CharField(max_length=255)
@@ -9,6 +25,14 @@ class User(models.Model):
     class Meta:
         managed = False
         db_table = "analytics_user"    #Django will NOT create or modify tables You're using an existing database
+
+class Document(models.Model):
+    document_id = models.AutoField(primary_key=True)
+    document_name = models.CharField(max_length=255)
+
+    class Meta:
+        managed = False
+        db_table = "analytics_document"
 
 class Workflow(models.Model):
     workflow_id = models.AutoField(primary_key=True)
