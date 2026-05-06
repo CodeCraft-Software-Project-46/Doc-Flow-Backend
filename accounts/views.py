@@ -10,7 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken  # Generate Tokens for 
 from .serializers import LoginSerializer, UserProfileSerializer
 from .serializers import UserProvisioningSerializer
 from .permissions import HasDynamicPermission 
-from django.db import connection
+from django.db import connection, transaction
 from django.core.mail import send_mail
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
@@ -18,6 +18,7 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth import update_session_auth_hash
+from .models import UserData # Import your new shadow model
 
 class LoginView(APIView):
     # Anyone can try to log in, so no permission checks yet
@@ -210,7 +211,7 @@ class PasswordResetConfirmView(APIView):
 
 
 class ChangePasswordView(APIView):
-    permission_classes = [IsAuthenticated] # Must be logged in[cite: 5]
+    permission_classes = [IsAuthenticated] # Must be logged in
 
     def post(self, request):
         user = request.user
@@ -236,3 +237,56 @@ class ChangePasswordView(APIView):
         )
 
         return Response({"message": "Password updated successfully!"})
+
+class ProfileView(APIView):
+    permission_classes = [IsAuthenticated] # User must be logged in
+
+    def get(self, request):
+        try:
+            # Switch from id=request.user.id to username=request.user.username
+            shadow_user = UserData.objects.get(username=request.user.username)
+        
+            return Response({
+                "username": shadow_user.username,
+                "email": shadow_user.email,
+                "mobile": shadow_user.contact_number,
+                "address": shadow_user.address,
+                "name": shadow_user.name,
+            })
+        
+        except UserData.DoesNotExist:
+            # Helpful debug message for your terminal
+            print(f"CRITICAL: Username '{request.user.username}' not found in user_user table!")
+            return Response({"error": "Profile data not found in custom table."}, status=404)\
+        
+
+    def put(self, request):
+        data = request.data
+        user = request.user
+        try:
+            shadow_user = UserData.objects.get(id=request.user.id)
+            
+            # 2. Update the shadow record
+            shadow_user.username = data.get('username', shadow_user.username)
+            shadow_user.email = data.get('email', shadow_user.email)
+            shadow_user.contact_number = data.get('mobile', shadow_user.contact_number)
+            shadow_user.address = data.get('address', shadow_user.address)
+            shadow_user.name = data.get('name', shadow_user.name)
+
+            shadow_user.save(force_update=True)
+
+            user.username = data.get('username', user.username)
+            user.email = data.get('email', user.email)
+            if 'name' in data:
+                # Basic logic to split a full name into first/last for auth_user
+                names = data.get('name').split(' ', 1)
+                user.first_name = names[0]
+                user.last_name = names[1] if len(names) > 1 else ""
+                
+            user.save()
+
+            
+            
+            return Response({"message": "Details updated in user_user table!"})
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
