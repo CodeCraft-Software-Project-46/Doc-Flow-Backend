@@ -1,0 +1,308 @@
+import math
+from django.utils import timezone
+from django.db.models import (
+    Avg,
+    Count,
+    Q,
+    F,
+    ExpressionWrapper,
+    DurationField
+)
+
+from analytics.models import (
+    TaskInstance,
+    WorkflowInstance,
+    Workflow,
+    User,
+    Role,
+    Document,
+    Department
+)
+
+
+class OverallWidgets:
+
+    # =========================================================
+    # BASE QUERIES (CONSISTENT SOURCE OF TRUTH)
+    # =========================================================
+    @staticmethod
+    def _completed_tasks():
+        return TaskInstance.objects.filter(
+            status="completed",
+            completed_at__isnull=False
+        )
+
+    @staticmethod
+    def _completed_workflow_instances():
+        return WorkflowInstance.objects.filter(
+            status="completed",
+            completed_at__isnull=False
+        )
+
+    # =========================================================
+    # RUNNING DOCUMENTS
+    # =========================================================
+    @staticmethod
+    def running_documents():
+
+        workflows = {
+            w.workflow_id: w.name
+            for w in Workflow.objects.all()
+        }
+
+        documents = {
+            d.document_id: d.document_name
+            for d in Document.objects.all()
+        }
+
+        now = timezone.now()
+
+        instances = WorkflowInstance.objects.filter(status="running")
+
+        result = []
+
+        for inst in instances:
+            running_hours = 0
+            if inst.created_at:
+                running_hours = (now - inst.created_at).total_seconds() / 3600
+
+            result.append({
+                "instance_id": inst.instance_id,
+                "instance_name": inst.instance_name,
+                "workflow_id": inst.workflow_id,
+                "workflow_name": workflows.get(inst.workflow_id),
+                "document_id": inst.document_id,
+                "document_name": documents.get(inst.document_id),
+                "status": inst.status,
+                "created_at": inst.created_at,
+                "running_hours": round(running_hours, 2)
+            })
+
+        return {
+            "count": instances.count(),
+            "documents": result
+        }
+
+    # =========================================================
+    # ACTIVE OVERDUE TASKS
+    # =========================================================
+    @staticmethod
+    def active_overdue_tasks():
+
+        now = timezone.now()
+
+        queryset = TaskInstance.objects.filter(
+            sla_status="breached"
+        ).exclude(status="completed")
+
+        workflows = {
+            w.workflow_id: w.name for w in Workflow.objects.all()
+        }
+
+        documents = {
+            d.document_id: d.document_name for d in Document.objects.all()
+        }
+
+        users = {u.role_id: u for u in User.objects.all()}
+        roles = {r.role_id: r.role_name for r in Role.objects.all()}
+        departments = {d.department_id: d.department_name for d in Department.objects.all()}
+
+        result = []
+
+        for task in queryset:
+
+            wf_instance = task.workflow_instance
+            user = users.get(task.assigned_role_id)
+
+            overdue_hours = None
+            overdue_days = None
+
+            if task.due_at:
+                diff = now - task.due_at
+                overdue_hours = round(diff.total_seconds() / 3600, 2)
+                overdue_days = round(diff.total_seconds() / 86400, 2)
+
+            result.append({
+                "task_id": task.task_id,
+                "task_name": task.task_name,
+                "status": task.status,
+                "due_at": task.due_at,
+                "instance_name": wf_instance.instance_name,
+                "workflow_name": workflows.get(wf_instance.workflow_id),
+                "document_name": documents.get(wf_instance.document_id),
+                "user_name": user.user_name if user else None,
+                "role": roles.get(task.assigned_role_id),
+                "department": departments.get(user.department_id) if user else None,
+                "overdue_hours": overdue_hours,
+                "overdue_days": overdue_days
+            })
+
+        return {
+            "count": len(result),
+            "tasks": result
+        }
+
+    # =========================================================
+    # COMPLETED TASKS
+    # =========================================================
+    @staticmethod
+    def completed_tasks():
+        return {
+            "count": OverallWidgets._completed_tasks().count()
+        }
+
+    # =========================================================
+    # SLA COMPLIANCE (FIXED CONSISTENCY)
+    # =========================================================
+    @staticmethod
+    def sla_compliance():
+
+        completed = OverallWidgets._completed_tasks()
+
+        total = completed.count()
+        met = completed.filter(sla_status="met").count()
+
+        percentage = round((met / total * 100), 2) if total else 0
+
+        return {
+            "total": total,
+            "met": met,
+            "percentage": percentage
+        }
+
+    # =========================================================
+    # SLA DISTRIBUTION (FIXED CONSISTENCY)
+    # =========================================================
+    @staticmethod
+    def sla_distribution():
+
+        completed = OverallWidgets._completed_tasks()
+
+        met = completed.filter(sla_status="met").count()
+        breached = completed.filter(sla_status="breached").count()
+
+        return {
+            "data": [
+                {"name": "met", "value": met},
+                {"name": "breached", "value": breached}
+            ]
+        }
+
+    # =========================================================
+    # BOTTLENECK WORKFLOWS (CLEAN + CONSISTENT)
+    # =========================================================
+    @staticmethod
+    def bottleneck_workflows():
+
+        workflows = Workflow.objects.all()
+
+        metrics = []
+
+        for wf in workflows:
+
+            instances = OverallWidgets._completed_workflow_instances().filter(
+                workflow_id=wf.workflow_id
+            )
+
+            instance_count = instances.count()
+
+            avg_time = instances.aggregate(
+                avg=Avg(
+                    ExpressionWrapper(
+                        F("completed_at") - F("created_at"),
+                        output_field=DurationField()
+                    )
+                )
+            )["avg"]
+
+            avg_hours = (avg_time.total_seconds() / 3600) if avg_time else 0
+
+            tasks = OverallWidgets._completed_tasks().filter(
+                workflow_instance__workflow_id=wf.workflow_id
+            )
+
+            total_tasks = tasks.count()
+            breached = tasks.filter(sla_status="breached").count()
+
+            breach_pct = (breached / total_tasks * 100) if total_tasks else 0
+
+            metrics.append({
+                "workflow": wf,
+                "avg_hours": avg_hours,
+                "breach_pct": breach_pct,
+                "total_tasks": total_tasks,
+                "instances": instance_count
+            })
+
+        max_hours = max([m["avg_hours"] for m in metrics], default=1)
+
+        result = []
+
+        for m in metrics:
+
+            norm_time = m["avg_hours"] / max_hours
+            norm_breach = m["breach_pct"] / 100
+            norm_volume = math.log(m["total_tasks"] + 1)
+
+            score = (0.45 * norm_time) + (0.45 * norm_breach) + (0.10 * norm_volume)
+
+            if m["instances"] < 2:
+                score *= 0.5
+
+            result.append({
+                "workflow_id": m["workflow"].workflow_id,
+                "workflow_name": m["workflow"].name,
+                "avg_completion_time_hours": round(m["avg_hours"], 2),
+                "breach_percentage": round(m["breach_pct"], 2),
+                "total_tasks": m["total_tasks"],
+                "completed_instances": m["instances"],
+                "bottleneck_score": round(score, 4)
+            })
+
+        return sorted(result, key=lambda x: x["bottleneck_score"], reverse=True)
+
+    # =========================================================
+    # USER PERFORMANCE (FIXED CONSISTENCY)
+    # =========================================================
+    @staticmethod
+    def user_performance():
+
+        data = OverallWidgets._completed_tasks().values(
+            "assigned_role_id"
+        ).annotate(
+            total_tasks=Count("task_id"),
+            breached_tasks=Count("task_id", filter=Q(sla_status="breached")),
+            met_tasks=Count("task_id", filter=Q(sla_status="met")),
+            avg_time=Avg(
+                ExpressionWrapper(
+                    F("completed_at") - F("created_at"),
+                    output_field=DurationField()
+                )
+            )
+        )
+
+        users = {u.role_id: u for u in User.objects.all()}
+
+        result = []
+
+        for item in data:
+
+            role_id = item["assigned_role_id"]
+            user = users.get(role_id)
+
+            total = item["total_tasks"]
+            met = item["met_tasks"]
+
+            compliance = (met / total * 100) if total else 0
+            avg_hours = (item["avg_time"].total_seconds() / 3600) if item["avg_time"] else 0
+
+            result.append({
+                "user_name": user.user_name if user else f"Role {role_id}",
+                "role_id": role_id,
+                "total_tasks": total,
+                "breached_tasks": item["breached_tasks"],
+                "avg_completion_time_hours": round(avg_hours, 2),
+                "sla_compliance": round(compliance, 2)
+            })
+
+        return result

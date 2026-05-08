@@ -46,8 +46,16 @@ class Workflow(models.Model):
 
 class WorkflowInstance(models.Model):
     instance_id = models.AutoField(primary_key=True)
-    workflow_id = models.IntegerField(db_column="workflow_id")
-    instance_name = models.CharField(max_length=255)  
+
+    # 🔥 FIXED: real foreign key instead of integer
+    workflow = models.ForeignKey(
+        Workflow,
+        on_delete=models.DO_NOTHING,
+        db_column="workflow_id",
+        related_name="instances"
+    )
+
+    instance_name = models.CharField(max_length=255)
     created_at = models.DateTimeField()
     document_id = models.IntegerField(blank=True, null=True)
     status = models.CharField(max_length=50)

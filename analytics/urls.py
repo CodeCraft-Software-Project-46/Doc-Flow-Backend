@@ -13,12 +13,17 @@ urlpatterns = [
     path("widgets/user-performance/", UserPerformanceView.as_view()),
 
     # ================= WORKFLOW =================
+    path("widgets/workflows/", WorkflowListView.as_view()),
+
+    # KPI widgets
     path("widgets/workflow/<int:workflow_id>/total-instances/", WorkflowTotalInstancesView.as_view()),
-    path("widgets/workflow/<int:workflow_id>/completed-instances/", WorkflowCompletedInstancesView.as_view()),
     path("widgets/workflow/<int:workflow_id>/avg-completion-time/", WorkflowAvgCompletionTimeView.as_view()),
     path("widgets/workflow/<int:workflow_id>/sla-compliance/", WorkflowSLAComplianceView.as_view()),
-    path("widgets/workflow/<int:workflow_id>/step-flow/", WorkflowStepFlowView.as_view()),
 
-    # ================= INSTANCE =================
+    # flow + structure
+    path("widgets/workflow/<int:workflow_id>/step-flow/", WorkflowStepFlowView.as_view()),
+    path("widgets/workflow/<int:workflow_id>/instances/", WorkflowInstanceListView.as_view()),
+
+    # drilldown
     path("widgets/instance/<int:instance_id>/drilldown/", InstanceDrilldownView.as_view()),
 ]
