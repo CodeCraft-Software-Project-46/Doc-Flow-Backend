@@ -83,31 +83,104 @@ class WorkflowWidgets:
     @staticmethod
     def step_flow(workflow_id):
 
-        # Why:
-        # We need all task executions belonging to this workflow
-        # to calculate progression through each step.
-        tasks = TaskInstance.objects.filter(
-            workflow_instance__workflow_id=workflow_id
+        # All workflow instances
+        instances = WorkflowInstance.objects.filter(
+            workflow_id=workflow_id
         )
 
-        # Why:
-        # Frontend needs workflow-level completion summary
-        # for displaying KPI section above/below flow.
-        total_instances = WorkflowInstance.objects.filter(
-            workflow_id=workflow_id
-        ).count()
+        total_instances = instances.count()
 
-        completed_instances = WorkflowInstance.objects.filter(
-            workflow_id=workflow_id,
+        completed_instances = instances.filter(
             status="completed"
         ).count()
 
-        # Why:
-        # Prevent divide-by-zero errors when no instances exist.
         completion_rate = (
             round((completed_instances / total_instances) * 100, 2)
             if total_instances else 0
         )
+
+        # Get all unique task names in order
+        task_names = (
+            TaskInstance.objects.filter(
+                workflow_instance__workflow_id=workflow_id
+            )
+            .values_list("task_name", flat=True)
+            .distinct()
+        )
+
+        steps = []
+
+        for task_name in task_names:
+
+            task_queryset = TaskInstance.objects.filter(
+                workflow_instance__workflow_id=workflow_id,
+                task_name=task_name
+            )
+
+            received = task_queryset.count()
+
+            passed = task_queryset.filter(
+                status="completed"
+            ).count()
+
+            processing = task_queryset.filter(
+                status="running"
+            ).count()
+
+            breached = task_queryset.filter(
+                sla_status="breached"
+            ).count()
+
+            sla_met = task_queryset.filter(
+                sla_status="met"
+            ).count()
+
+            breach_percentage = (
+                round((breached / received) * 100, 2)
+                if received else 0
+            )
+
+            # Processing document names
+            processing_documents = []
+
+            running_tasks = task_queryset.filter(
+                status="running"
+            ).select_related("workflow_instance")
+
+            for task in running_tasks:
+
+                document_id = task.workflow_instance.document_id
+
+                if document_id:
+                    try:
+                        document = Document.objects.get(
+                            document_id=document_id
+                        )
+
+                        processing_documents.append(
+                            document.document_name
+                        )
+
+                    except Document.DoesNotExist:
+                        pass
+
+            steps.append({
+                "task_name": task_name,
+
+                "received": received,
+
+                "passed": passed,
+
+                "processing": processing,
+
+                "sla_met": sla_met,
+
+                "breached": breached,
+
+                "breach_percentage": breach_percentage,
+
+                "processing_documents": processing_documents
+            })
 
         return {
             "total_instances": total_instances,
@@ -116,36 +189,7 @@ class WorkflowWidgets:
 
             "completion_rate": completion_rate,
 
-            "steps": list(
-                tasks.values("task_name").annotate(
-
-                    # Why:
-                    # Number of task records entering this step.
-                    received=Count("task_id"),
-
-                    # Why:
-                    # Helps frontend identify active bottlenecks.
-                    processing=Count(
-                        "task_id",
-                        filter=Q(status="running")
-                    ),
-
-                    # Why:
-                    # Shows how many passed this stage.
-                    passed=Count(
-                        "task_id",
-                        filter=Q(status="completed")
-                    ),
-
-                    # Why:
-                    # SLA quality indicator for this step.
-                    sla_met=Count(
-                        "task_id",
-                        filter=Q(sla_status="met")
-                    )
-
-                ).order_by("task_name")
-            )
+            "steps": steps
         }
 
     # =====================================================

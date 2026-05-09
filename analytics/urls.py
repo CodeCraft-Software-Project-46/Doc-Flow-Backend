@@ -22,8 +22,8 @@ urlpatterns = [
 
     # flow + structure
     path("widgets/workflow/<int:workflow_id>/step-flow/", WorkflowStepFlowView.as_view()),
-    path("widgets/workflow/<int:workflow_id>/instances/", WorkflowInstanceListView.as_view()),
 
     # drilldown
+    path("widgets/workflow/<int:workflow_id>/instances/", WorkflowInstanceListView.as_view()),
     path("widgets/instance/<int:instance_id>/drilldown/", InstanceDrilldownView.as_view()),
 ]
