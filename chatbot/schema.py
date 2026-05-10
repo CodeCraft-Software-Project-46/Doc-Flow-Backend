@@ -164,4 +164,18 @@ LOWER(awi.instance_name) LIKE LOWER('%Invoice A%')
 BAD:
 ati.task_name = 'Dept Approval task'
 
+==================================================
+STRICT TEXT MATCHING RULE
+==================================================
+
+ALWAYS use:
+
+LOWER(column_name) LIKE LOWER('%value%')
+
+NEVER use:
+=
+for text comparisons.
+
+ALL text searching MUST be case-insensitive.
+
 """

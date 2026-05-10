@@ -15,10 +15,10 @@ class GeminiProvider:
 
     def generate(self, prompt):
         response = self.client.models.generate_content(
-            model="gemini-2.5-flash",     #gemini-3-flash-preview      gemini-2.5-flash
+            model="gemini-3-flash-preview",     #gemini-3-flash-preview      gemini-2.5-flash
             contents=prompt
         )
-        return response.text
+        return response.text.strip()
         
 class LLMService:
     def __init__(self):

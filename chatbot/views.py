@@ -1,5 +1,3 @@
-# chatbot/views.py
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -25,7 +23,7 @@ class ChatBotView(APIView):
 
             llm = LLMService()
 
-            # STEP 1 — Generate SQL Query
+            # STEP 1 — Generate SQL
             sql_prompt = PromptService.generate_sql_prompt(
                 user_message
             )
@@ -37,7 +35,7 @@ class ChatBotView(APIView):
                 generated_sql
             )
 
-            # STEP 3 — Generate Natural Response
+            # STEP 3 — Generate response
             response_prompt = PromptService.generate_response_prompt(
                 user_message,
                 results
@@ -46,15 +44,18 @@ class ChatBotView(APIView):
             final_answer = llm.generate(response_prompt)
 
             return Response({
-                "question": user_message,
-                "generated_sql": generated_sql,
+                "answer": final_answer,
                 "data": results,
-                "answer": final_answer
+                "generated_sql": generated_sql
             })
 
         except Exception as e:
+            print("Backend Error:", e)  # log only
 
             return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {
+                    "question": user_message,
+                    "answer": "Sorry, I couldn’t process your request right now. Please try again later."
+                },
+                status=status.HTTP_200_OK
             )
