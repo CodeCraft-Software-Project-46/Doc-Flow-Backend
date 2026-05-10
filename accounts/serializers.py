@@ -1,4 +1,6 @@
-# Serializers are acting as translators between Django(Python) and React(JavaScript).
+# Serializers are acting as translators between Django(Python) and React(JavaScript) 
+# and to Validate the data that the frontend sends us. 
+# They also help us to control exactly what data we send back to the frontend, and how we format it.
 
 from rest_framework import serializers
 from django.contrib.auth import authenticate
@@ -6,7 +8,7 @@ from django.contrib.auth.models import User
 from .models import UserProfile
 from django.utils.crypto import get_random_string
 
-class LoginSerializer(serializers.Serializer): # Used to receive Data from the Frontend.
+class LoginSerializer(serializers.Serializer): # Used to validate the login credentials that the frontend sends.
     # We expect the frontend to send us a username and password when try to log in, so we define those fields here
     username = serializers.CharField()
     password = serializers.CharField(write_only=True) # write_only means, we NEVER send the password back to the frontend

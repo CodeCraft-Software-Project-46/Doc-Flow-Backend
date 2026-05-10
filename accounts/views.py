@@ -8,9 +8,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated # To check if the user is allowed to use the route.(Valid Token Check)
 from rest_framework_simplejwt.tokens import RefreshToken  # Generate Tokens for User
 from .serializers import LoginSerializer, UserProfileSerializer
-from .serializers import UserProvisioningSerializer
-from .permissions import HasDynamicPermission 
-from django.db import connection, transaction
+from django.db import connection
 from django.core.mail import send_mail
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
@@ -18,14 +16,14 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth import update_session_auth_hash
-from .models import UserData # Import your new shadow model
+from .models import UserData
 
 class LoginView(APIView):
     # Anyone can try to log in, so no permission checks yet
     permission_classes = [] 
 
     def post(self, request):
-        # 1. Hand data to the Bouncer
+        # 1. Hand data to the Serializer for validation and authentication.
         serializer = LoginSerializer(data=request.data)
         
         if not serializer.is_valid():
@@ -35,23 +33,19 @@ class LoginView(APIView):
                 action='LOGIN_FAILED',
                 description=f"Failed login attempt for username: {attempted_username}"
             )
-            # Bouncer says no! Return the error to the user.
+            # Serializer says no! Return the error to the user.
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2. Bouncer says yes: Grab the verified user from the serializer's validated_date Dictonary.
+        # 2. Serializer says yes: Grab the verified user from the serializer's validated_date Dictonary.
         user = serializer.validated_data['user']
         
         # 3. Get the Tokens
         refresh = RefreshToken.for_user(user)
         access_token = refresh.access_token
-        
-
-
-       
 
         try:
             with connection.cursor() as cursor:
-                # Direct query using the custom user_user table
+                # Direct query using the custom user_user table for roles and permissions
                 query = """
                     SELECT ur.name as role_name, up.permission_name
                     FROM auth_user au
@@ -66,7 +60,7 @@ class LoginView(APIView):
 
                 if rows:
                     access_token['roles'] = [rows[0][0]] # Role Name
-                    access_token['permissions'] = list(set([row[1] for row in rows])) # Unique Permissions
+                    access_token['permissions'] = list(set([row[1] for row in rows])) # Attach all unique permissions for that role to the token
                 else:
                     access_token['roles'] = ['Guest']
                     access_token['permissions'] = ['can_view_dashboard']
@@ -123,35 +117,10 @@ class CurrentUserView(APIView):
         return Response(serializer.data)
     
 
-
-class UserProvisioningView(APIView):
-    # 1. THE LOCK: Only someone with the 'can_add_user' permission can do this!
-    permission_classes = [HasDynamicPermission]
-    required_permission = 'can_add_user'
-
-    def post(self, request):
-        serializer = UserProvisioningSerializer(data=request.data)
-        
-        if serializer.is_valid():
-            # This triggers the create() method in our serializer
-            user = serializer.save() 
-            
-            # We respond with the auto-generated password so the Admin UI can display it
-            return Response({
-                "message": "User created successfully.",
-                "user": {
-                    "email": user.email,
-                    "full_name": f"{user.first_name} {user.last_name}".strip(),
-                    "department": user.profile.department,
-                },
-                "temp_password": user.temp_password 
-            }, status=status.HTTP_201_CREATED)
-            
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 class PasswordResetRequestView(APIView):
     permission_classes = []  # Publicly accessible
+
+    # If the user successfully resets their password, the hash changes, which automatically makes this token invalid so it can't be used again.
 
     def post(self, request):
         email = request.data.get('email')
@@ -166,7 +135,7 @@ class PasswordResetRequestView(APIView):
             # Note: Point this to your React domain, not the Django API
             reset_link = f"http://localhost:5173/reset-password/{uid}/{token}/"
             
-            # 3. Send the Email using existing settings[cite: 3]
+            # 3. Send the Email using existing settings
             send_mail(
                 subject="DocFlow Password Reset",
                 message=f"Click the link to reset your password: {reset_link}",
@@ -175,7 +144,7 @@ class PasswordResetRequestView(APIView):
                 fail_silently=False,
             )
             
-            # 4. Log the action[cite: 2]
+            # 4. Log the action
             log_action(action='PASSWORD_RESET_REQUESTED', user=user, description=f"Reset link sent to {email}")
 
         # Always return 200 to prevent user enumeration
@@ -285,7 +254,6 @@ class ProfileView(APIView):
                 
             user.save()
 
-            
             
             return Response({"message": "Details updated in user_user table!"})
         except Exception as e:

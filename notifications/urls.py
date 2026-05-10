@@ -1,12 +1,12 @@
 from django.urls import path
-from .views import NotificationRuleListView, UserInboxView, NotificationRuleDetailView, RecipientOptionsView, MarkNotificationReadView
+from .views import NotificationRuleListView, UserInboxView, NotificationRuleDetailView, RecipientOptionsView, MarkNotificationReadView, NotificationMetadataView
 
 urlpatterns = [
-    # API for the Admin Dashboard
-    path('rules/', NotificationRuleListView.as_view(), name='notification-rules'),
+    path('rules/', NotificationRuleListView.as_view(), name='notification-rules'), # API for the Admin Dashboard
     
-    # API for the User's Sidebar Bell
-    path('inbox/', UserInboxView.as_view(), name='notification-inbox'),
+    path('inbox/', UserInboxView.as_view(), name='notification-inbox'),# API for the User's Sidebar Bell
+
+    path('metadata/', NotificationMetadataView.as_view(), name='notification-metadata'), # API for dynamic notification options
 
     path('rules/<int:pk>/', NotificationRuleDetailView.as_view()), # For toggle/delete
 

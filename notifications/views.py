@@ -1,13 +1,14 @@
 from rest_framework import generics, views, response, status
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.models import User
+from accounts.models import RoleData, UserData
 from audits.utils import log_action
 
 # Corrected Imports: Pull from your local models and the workflows app
 from .models import NotificationRule, Notification
 from .serializers import NotificationRuleSerializer, NotificationInboxSerializer
 from .external_models import Role # Roles live in workflows, not accounts 
-from accounts.permissions import HasDynamicPermission # Your custom security guard 
+from accounts.permissions import HasDynamicPermission # Your custom security guard
 
 class NotificationRuleListView(generics.ListCreateAPIView):
     """
@@ -17,7 +18,7 @@ class NotificationRuleListView(generics.ListCreateAPIView):
     queryset = NotificationRule.objects.all().order_by('-created_at')
     serializer_class = NotificationRuleSerializer
     
-    # Use your dynamic guard: only users with 'can_manage_notifications' enter [cite: 68, 1066]
+    # Only users with 'can_manage_notifications' enter the Notification Dashboard, so only they can create/edit rules.
     permission_classes = [HasDynamicPermission]
     required_permission = 'can_manage_notifications'
 
@@ -29,9 +30,39 @@ class NotificationRuleListView(generics.ListCreateAPIView):
             action='NOTIFICATION_RULE_CREATED',
             user=self.request.user,
             request=self.request,
-            description=f"New Notification Rule Created: {instance.name}" # Note: use 'name' as per your model
+            description=f"New Notification Rule Created: {instance.name}"
         )
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .models import NotificationRule # Import your model
+from accounts.models import RoleData # From our previous step
+
+class NotificationMetadataView(APIView):
+    """
+    Returns all dynamic options for the Notification Rule modal.
+    """
+    def get(self, request):
+        # 1. Get Event Choices from Model
+        events = [
+            {"value": key, "label": label} 
+            for key, label in NotificationRule.EVENT_CHOICES
+        ]
+
+        # 2. Get Channel Choices from Model
+        channels = [
+            {"value": key, "label": label} 
+            for key, label in NotificationRule.CHANNEL_CHOICES
+        ]
+
+        # 3. Get Roles from our Shadow Model (user_role table)
+        roles = RoleData.objects.values_list('name', flat=True)
+
+        return Response({
+            "events": events,
+            "channels": channels,
+            "roles": list(roles)
+        })
 
 class UserInboxView(generics.ListAPIView):
     """
@@ -104,14 +135,12 @@ class RecipientOptionsView(views.APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Pull dynamic roles from Avishka's workflow tables [cite: 769, 1146]
-        roles = Role.objects.values_list('name', flat=True)
-        # Pull all available users from the system [cite: 83, 105]
-        users = User.objects.values_list('username', flat=True)
+        # Pull dynamic roles from Avishka's workflow tables
+        roles = RoleData.objects.values_list('name', flat=True)
         
         return response.Response({
-            "roles": [f"Role: {r}" for r in roles],
-            "users": [f"User: {u}" for u in users]
+            "roles": [f"{r}" for r in roles],
+            "users": []
         })
 
 class MarkNotificationReadView(views.APIView):
