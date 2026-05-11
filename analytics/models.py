@@ -80,11 +80,11 @@ class TaskInstance(models.Model):
 
     created_at = models.DateTimeField()
     status = models.CharField(max_length=50)
-    due_at = models.DateTimeField()
+    due_at = models.DateTimeField(null=True,blank=True)
 
     assigned_role_id = models.IntegerField(null=True)
 
-    sla_hours = models.IntegerField()
+    sla_hours = models.FloatField()
     completed_at = models.DateTimeField(null=True)
 
     sla_status = models.CharField(max_length=50, null=True)
