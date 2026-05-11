@@ -267,3 +267,39 @@ class ChangeDashboardStatus(APIView):
             })
 
         return Response({"error": "Invalid status"}, status=400)
+
+class DeleteDashboard(APIView):
+
+    def delete(self, request, dashboard_id):
+
+        try:
+            dashboard = Dashboard.objects.get(id=dashboard_id)
+        except Dashboard.DoesNotExist:
+            return Response({"error": "Dashboard not found"}, status=404)
+
+        role = dashboard.role
+        # IF DASHBOARD IS ACTIVE
+
+        if dashboard.status == "active":
+
+            fallback = Dashboard.objects.filter(
+                role=role
+            ).exclude(id=dashboard.id).first()
+
+            # no fallback available → block delete
+            if not fallback:
+                return Response({
+                    "error": "Cannot delete the only active dashboard for this role.",
+                    "hint": "Create another dashboard first."
+                }, status=400)
+
+            # promote fallback to active
+            fallback.status = "active"
+            fallback.save()
+
+        # DELETE DASHBOARD
+        dashboard.delete()
+
+        return Response({
+            "message": "Dashboard deleted successfully"
+        })
