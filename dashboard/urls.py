@@ -1,7 +1,7 @@
 from django.urls import path
 
 from dashboard.views import GetAccessibleWidgets, SaveDashboard, GetDashboardList, GetDashboard, UpdateDashboard, \
-    ChangeDashboardStatus
+    ChangeDashboardStatus, DeleteDashboard
 
 urlpatterns = [
     path('getAccessibleWidgets/<role_id>/',GetAccessibleWidgets.as_view(),name='getAccessibleWidgets'),
@@ -10,4 +10,5 @@ urlpatterns = [
     path('getAllDashboard/',GetDashboardList.as_view(),name='getAllDashboard'),
     path('getDashboard/<dashboard_id>/',GetDashboard.as_view(),name='getDashboard'),
     path('changeDashboardStatus/<dashboard_id>/',ChangeDashboardStatus.as_view(),name='changeDashboardStatus'),
+    path('deleteDashboard/<dashboard_id>/',DeleteDashboard.as_view(),name='deleteDashboard'),
 ]
