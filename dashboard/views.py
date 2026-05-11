@@ -303,3 +303,29 @@ class DeleteDashboard(APIView):
         return Response({
             "message": "Dashboard deleted successfully"
         })
+
+
+class GetActiveDashboard(APIView):
+
+    def get(self, request, role_id):
+
+        dashboard = Dashboard.objects.filter(
+            role_id=role_id,
+            status="active"
+        ).first()
+
+        if not dashboard:
+            return Response(
+                {"error": "No active dashboard"},
+                status=404
+            )
+
+        widgets = DashboardWidget.objects.filter(
+            dashboard=dashboard
+        )
+
+        return Response({
+            "id": dashboard.id,
+            "name": dashboard.name,
+            "widgets": list(widgets.values())
+        })
