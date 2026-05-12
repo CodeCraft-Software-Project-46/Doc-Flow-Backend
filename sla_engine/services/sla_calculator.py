@@ -84,7 +84,6 @@ def update_task_due_at(task_id):
     task = TaskInstance.objects.get(task_id=task_id)
 
     config = WorkingHoursConfig.objects.first()
-
     if not config:
         raise Exception("WorkingHoursConfig not found")
 
@@ -94,15 +93,25 @@ def update_task_due_at(task_id):
         config=config
     )
 
-    TaskInstance.objects.filter(task_id=task_id).update(due_at=due_at)
+    TaskInstance.objects.filter(task_id=task_id).update(
+        due_at=due_at
+    )
 
-    # ✅ schedule SLA checking at exact due_at time
+    # ❗ SAFE JOB ID
+    job_id = f"sla_task_{task.task_id}"
+
+    # remove old job if exists
+    existing_job = scheduler.get_job(job_id)
+    if existing_job:
+        scheduler.remove_job(job_id)
+
+    # add new job safely
     scheduler.add_job(
         check_sla_status,
         trigger="date",
         run_date=due_at,
         args=[task.task_id],
-        id=f"sla_task_{task.task_id}",
+        id=job_id,
         replace_existing=True
     )
 

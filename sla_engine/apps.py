@@ -1,3 +1,4 @@
+import os
 from django.apps import AppConfig
 
 
@@ -6,7 +7,13 @@ class SlaEngineConfig(AppConfig):
     name = "sla_engine"
 
     def ready(self):
-        import sla_engine.signals
-        from sla_engine.scheduler import start_scheduler
 
-        start_scheduler()
+        # ❗ NEVER run during tests
+        if os.environ.get("RUN_MAIN") != "true":
+            return
+
+        try:
+            from sla_engine.scheduler import start_scheduler
+            start_scheduler()
+        except Exception as e:
+            print("Scheduler start skipped:", e)

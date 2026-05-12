@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     'working_hours',
     'chatbot',
     'analytics',
-    'sla_engine.apps.SlaEngineConfig',
+    "sla_engine",
 ]
 
 MIDDLEWARE = [

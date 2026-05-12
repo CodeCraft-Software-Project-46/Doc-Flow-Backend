@@ -13,6 +13,7 @@ def auto_calculate_due_at(sender, instance, created, **kwargs):
     if kwargs.get("raw"):
         return
 
+    # ❗ ONLY RUN ON CREATE (NEVER ON UPDATE)
     if created:
         transaction.on_commit(
             lambda: update_task_due_at(instance.task_id)
