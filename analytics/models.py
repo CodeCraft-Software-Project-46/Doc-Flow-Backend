@@ -18,13 +18,26 @@ class Role(models.Model):
 
 class User(models.Model):
     user_id = models.AutoField(primary_key=True)
+
     user_name = models.CharField(max_length=255)
-    department_id = models.IntegerField()
-    role_id = models.IntegerField()
+
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.DO_NOTHING,
+        db_column="department_id",
+        related_name="users"
+    )
+
+    role = models.ForeignKey(
+        Role,
+        on_delete=models.DO_NOTHING,
+        db_column="role_id",
+        related_name="users"
+    )
 
     class Meta:
         managed = False
-        db_table = "analytics_user"    #Django will NOT create or modify tables You're using an existing database
+        db_table = "analytics_user"    #Django will NOT create or modify tables You're using an existing database just reading existing tables... 
 
 class Document(models.Model):
     document_id = models.AutoField(primary_key=True)
@@ -47,7 +60,6 @@ class Workflow(models.Model):
 class WorkflowInstance(models.Model):
     instance_id = models.AutoField(primary_key=True)
 
-    # 🔥 FIXED: real foreign key instead of integer
     workflow = models.ForeignKey(
         Workflow,
         on_delete=models.DO_NOTHING,

@@ -1,29 +1,12 @@
 import math
 from django.utils import timezone
-from django.db.models import (
-    Avg,
-    Count,
-    Q,
-    F,
-    ExpressionWrapper,
-    DurationField
-)
-
-from analytics.models import (
-    TaskInstance,
-    WorkflowInstance,
-    Workflow,
-    User,
-    Role,
-    Document,
-    Department
-)
-
+from django.db.models import Avg, Count, Q, F, ExpressionWrapper, DurationField
+from analytics.models import TaskInstance, WorkflowInstance, Workflow, User, Role, Document, Department
 
 class OverallWidgets:
 
     # =========================================================
-    # BASE QUERIES (CONSISTENT SOURCE OF TRUTH)
+    # reusable base query methods to reduce code duplication and ensure consistency
     # =========================================================
     @staticmethod
     def _completed_tasks():
@@ -45,15 +28,15 @@ class OverallWidgets:
     @staticmethod
     def running_documents():
 
-        workflows = {
-            w.workflow_id: w.name
-            for w in Workflow.objects.all()
-        }
-
-        documents = {
-            d.document_id: d.document_name
-            for d in Document.objects.all()
-        }
+        workflows = {}
+        for workflow in Workflow.objects.all(): #creates dictionary entries
+            workflows[workflow.workflow_id] = workflow.name         #{
+                                                                    #     1: "Leave Approval",
+                                                                    #     2: "Invoice Workflow"
+                                                                    # }
+        documents = {}
+        for document in Document.objects.all():
+            documents[document.document_id] = document.document_name
 
         now = timezone.now()
 
@@ -90,34 +73,39 @@ class OverallWidgets:
     def active_overdue_tasks():
 
         now = timezone.now()
-
         queryset = TaskInstance.objects.filter(
             sla_status="breached"
         ).exclude(status="completed")
 
-        workflows = {
-            w.workflow_id: w.name for w in Workflow.objects.all()
-        }
+        workflows = {}
+        for workflow in Workflow.objects.all():
+            workflows[workflow.workflow_id] = workflow.name
 
-        documents = {
-            d.document_id: d.document_name for d in Document.objects.all()
-        }
+        documents = {}
+        for document in Document.objects.all():
+            documents[document.document_id] = document.document_name
 
-        users = {u.role_id: u for u in User.objects.all()}
-        roles = {r.role_id: r.role_name for r in Role.objects.all()}
-        departments = {d.department_id: d.department_name for d in Department.objects.all()}
+        users = {}
+        for user in User.objects.all():
+            users[user.role_id] = user
+
+        roles = {}
+        for role in Role.objects.all():
+            roles[role.role_id] = role.role_name
+
+        departments = {}
+        for department in Department.objects.all():
+            departments[department.department_id] = department.department_name
 
         result = []
 
         for task in queryset:
-
             wf_instance = task.workflow_instance
             user = users.get(task.assigned_role_id)
-
             overdue_hours = None
             overdue_days = None
 
-            if task.due_at:
+            if task.due_at: #if due at exists
                 diff = now - task.due_at
                 overdue_hours = round(diff.total_seconds() / 3600, 2)
                 overdue_days = round(diff.total_seconds() / 86400, 2)
@@ -126,7 +114,7 @@ class OverallWidgets:
                 "task_id": task.task_id,
                 "task_name": task.task_name,
                 "status": task.status,
-                "due_at": task.due_at,
+                "due_at": task.due_at,# epaa
                 "instance_name": wf_instance.instance_name,
                 "workflow_name": workflows.get(wf_instance.workflow_id),
                 "document_name": documents.get(wf_instance.document_id),
@@ -166,7 +154,7 @@ class OverallWidgets:
 
         return {
             "total": total,
-            "met": met,
+            "met": met, #epa 
             "percentage": percentage
         }
 
@@ -195,15 +183,12 @@ class OverallWidgets:
     def bottleneck_workflows():
 
         workflows = Workflow.objects.all()
-
         metrics = []
 
         for wf in workflows:
-
-            instances = OverallWidgets._completed_workflow_instances().filter(
+            instances = OverallWidgets._completed_workflow_instances().filter( #Get all completed instances of this workflow
                 workflow_id=wf.workflow_id
             )
-
             instance_count = instances.count()
 
             avg_time = instances.aggregate(

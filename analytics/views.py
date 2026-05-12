@@ -1,18 +1,8 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-# from analytics.services.widgets.running_documents import get_running_documents
-# from analytics.services.widgets.active_overdue_tasks import get_active_overdue_tasks
-# from analytics.services.widgets.completed_tasks import get_completed_tasks
-# from analytics.services.widgets.sla_compliance import get_sla_compliance
-# from analytics.services.widgets.sla_distribution import get_sla_distribution
-# from analytics.services.widgets.bottleneck_workflows import get_bottleneck_workflows
-# from analytics.services.widgets.user_performance import get_user_performance
-# from analytics.services.workflow_widgets import WorkflowWidgets
-
 from analytics.services.widgets.overall_widgets import OverallWidgets
 from analytics.services.widgets.workflow_widgets import WorkflowWidgets
-
 
 # =====================================================
 # OVERALL WIDGETS (each is separate API)
