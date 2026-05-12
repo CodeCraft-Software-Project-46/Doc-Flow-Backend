@@ -11,6 +11,6 @@ def evaluate_sla(task_id):
     else:
         status = "breached" if now >= task.due_at else None
 
-    TaskInstance.objects.filter(task_id=task_id).update(
-        sla_status=status
-    )
+    task = TaskInstance.objects.get(task_id=task_id)
+    task.sla_status = status
+    task.save(update_fields=["sla_status"])

@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from analytics.models import TaskInstance
 from working_hours.models import WorkingHoursConfig
-from sla_engine.scheduler import scheduler, check_sla_status
+from sla_engine.scheduler import schedule_sla_job, start_scheduler
 
 
 def ensure_time(value):
@@ -93,26 +93,12 @@ def update_task_due_at(task_id):
         config=config
     )
 
-    TaskInstance.objects.filter(task_id=task_id).update(
-        due_at=due_at
-    )
+    task.due_at = due_at
+    task.save(update_fields=["due_at"])
 
-    # ❗ SAFE JOB ID
-    job_id = f"sla_task_{task.task_id}"
+    # Ensure scheduler is running in the current process before adding jobs.
+    start_scheduler()
 
-    # remove old job if exists
-    existing_job = scheduler.get_job(job_id)
-    if existing_job:
-        scheduler.remove_job(job_id)
-
-    # add new job safely
-    scheduler.add_job(
-        check_sla_status,
-        trigger="date",
-        run_date=due_at,
-        args=[task.task_id],
-        id=job_id,
-        replace_existing=True
-    )
+    schedule_sla_job(task.task_id, due_at)
 
     return due_at
