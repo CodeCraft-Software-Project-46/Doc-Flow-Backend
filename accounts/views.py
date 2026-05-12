@@ -49,7 +49,7 @@ class LoginView(APIView):
                 query = """
                     SELECT ur.name as role_name, up.permission_name
                     FROM auth_user au
-                    JOIN user_user uu ON au.id = uu.id
+                    JOIN user_user uu ON au.username = uu.username  -- FIX: Match on username instead of id
                     JOIN user_role ur ON uu.role_id = ur.id
                     JOIN user_rolepermission urp ON ur.id = urp.role_id
                     JOIN user_permission up ON urp.permission_id = up.permission_id
@@ -120,7 +120,8 @@ class CurrentUserView(APIView):
 class PasswordResetRequestView(APIView):
     permission_classes = []  # Publicly accessible
 
-    # If the user successfully resets their password, the hash changes, which automatically makes this token invalid so it can't be used again.
+    # If the user successfully resets their password, the hash changes, 
+    # which automatically makes this token invalid so it can't be used again.
 
     def post(self, request):
         email = request.data.get('email')
@@ -147,7 +148,7 @@ class PasswordResetRequestView(APIView):
             # 4. Log the action
             log_action(action='PASSWORD_RESET_REQUESTED', user=user, description=f"Reset link sent to {email}")
 
-        # Always return 200 to prevent user enumeration
+        # Always return 200 to prevent email enumeration attacks
         return Response({"message": "If an account exists with this email, a reset link has been sent."}, status=status.HTTP_200_OK)
     
 class PasswordResetConfirmView(APIView):
@@ -208,11 +209,11 @@ class ChangePasswordView(APIView):
         return Response({"message": "Password updated successfully!"})
 
 class ProfileView(APIView):
-    permission_classes = [IsAuthenticated] # User must be logged in
+    # This route is for both viewing and updating the user's profile.
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
-            # Switch from id=request.user.id to username=request.user.username
             shadow_user = UserData.objects.get(username=request.user.username)
         
             return Response({
@@ -224,7 +225,7 @@ class ProfileView(APIView):
             })
         
         except UserData.DoesNotExist:
-            # Helpful debug message for your terminal
+            # Helpful debug message for terminal
             print(f"CRITICAL: Username '{request.user.username}' not found in user_user table!")
             return Response({"error": "Profile data not found in custom table."}, status=404)\
         
@@ -233,7 +234,7 @@ class ProfileView(APIView):
         data = request.data
         user = request.user
         try:
-            shadow_user = UserData.objects.get(id=request.user.id)
+            shadow_user = UserData.objects.get(username=user.username)
             
             # 2. Update the shadow record
             shadow_user.username = data.get('username', shadow_user.username)
