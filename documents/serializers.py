@@ -29,11 +29,11 @@ class DocumentSerializer(serializers.ModelSerializer):
             'file_hash', 
             'ai_summary', 
             's3_url', 
-            'presigned_url', # <-- ADD THIS HERE!
+            'presigned_url', 
             'submitted_date',
             'updated_at'
         ]
-
+         #generate a temporary VIP pass (presigned URL) for the document stored in S3, allowing secure access without exposing the actual S3 URL or credentials.
     def get_presigned_url(self, obj):
         # If there is no file, return nothing
         if not obj.s3_url:

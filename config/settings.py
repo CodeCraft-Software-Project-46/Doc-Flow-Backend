@@ -176,7 +176,7 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'documents.tasks.scan_all_mapped_folders', 
         
         # Run every 60 seconds (Great for testing)
-        'schedule': 10.0, 
+        'schedule': 60.0, 
         
     },
 }

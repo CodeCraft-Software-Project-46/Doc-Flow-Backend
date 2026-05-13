@@ -16,7 +16,7 @@ class GDriveService:
         self.service = build('drive', 'v3', credentials=self.creds)
 
     def create_folder(self, folder_name, parent_folder_id=None):
-        """Creates a new folder in Google Drive"""
+        # Create a new folder in Google Drive. 
         file_metadata = {
             'name': folder_name,
             'mimeType': 'application/vnd.google-apps.folder'

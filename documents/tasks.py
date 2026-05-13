@@ -68,7 +68,7 @@ def scan_all_mapped_folders():
                     current_status='uploaded',
                     file_hash=file_hash,
                     ai_summary=summary_text,
-                    s3_url=s3_url # <-- Save the S3 URL!
+                    s3_url=s3_url 
                 )
                 
                 # 6. Save Google tracking data
