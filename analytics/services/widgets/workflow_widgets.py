@@ -1,14 +1,6 @@
-from django.db.models import Avg, F, ExpressionWrapper, DurationField, Q, Count
-from analytics.models import (
-    Workflow,
-    WorkflowInstance,
-    TaskInstance,
-    Document,
-    User,
-    Role
-)
+from django.db.models import Avg, F, ExpressionWrapper, DurationField
+from analytics.models import Workflow, WorkflowInstance, TaskInstance, Document, User, Role
 from django.utils import timezone
-
 
 class WorkflowWidgets:
 
@@ -49,9 +41,7 @@ class WorkflowWidgets:
                 )
             )
         )
-
         avg = data["avg_time"]
-
         return {
             "avg_completion_time_hours": round(avg.total_seconds() / 3600, 2) if avg else 0
         }
@@ -87,13 +77,10 @@ class WorkflowWidgets:
         instances = WorkflowInstance.objects.filter(
             workflow_id=workflow_id
         )
-
         total_instances = instances.count()
-
         completed_instances = instances.filter(
             status="completed"
         ).count()
-
         completion_rate = (
             round((completed_instances / total_instances) * 100, 2)
             if total_instances else 0
@@ -112,7 +99,7 @@ class WorkflowWidgets:
 
         for task_name in task_names:
 
-            task_queryset = TaskInstance.objects.filter(
+            task_queryset = TaskInstance.objects.filter( #Get all tasks that belong to a specific workflow AND have a specific task name
                 workflow_instance__workflow_id=workflow_id,
                 task_name=task_name
             )
@@ -124,7 +111,7 @@ class WorkflowWidgets:
             ).count()
 
             processing = task_queryset.filter(
-                status="running"
+                status="running" # or pending 
             ).count()
 
             breached = task_queryset.filter(
@@ -143,53 +130,39 @@ class WorkflowWidgets:
             # Processing document names
             processing_documents = []
 
-            running_tasks = task_queryset.filter(
+            running_tasks = task_queryset.filter( #From task_queryset, it picks only tasks that are: currently running (not completed yet) 
                 status="running"
             ).select_related("workflow_instance")
 
             for task in running_tasks:
-
                 document_id = task.workflow_instance.document_id
-
                 if document_id:
                     try:
-                        document = Document.objects.get(
+                        document = Document.objects.get( #If no document exists → Django throws error:
                             document_id=document_id
                         )
-
                         processing_documents.append(
                             document.document_name
                         )
-
                     except Document.DoesNotExist:
                         pass
 
             steps.append({
                 "task_name": task_name,
-
                 "received": received,
-
                 "passed": passed,
-
                 "processing": processing,
-
                 "sla_met": sla_met,
-
                 "breached": breached,
-
                 "breach_percentage": breach_percentage,
-
                 "processing_documents": processing_documents
             })
 
         return {
             "total_instances": total_instances,
-
             "completed_instances": completed_instances,
-
             "completion_rate": completion_rate,
-
-            "steps": steps
+            "steps": steps #oneda mewa 
         }
 
     # =====================================================

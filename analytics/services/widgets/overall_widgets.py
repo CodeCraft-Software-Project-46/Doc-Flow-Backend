@@ -191,19 +191,19 @@ class OverallWidgets:
             )
             instance_count = instances.count()
 
-            avg_time = instances.aggregate(
+            avg_time = instances.aggregate( #Get average completion time for each workflow 
                 avg=Avg(
-                    ExpressionWrapper(
+                    ExpressionWrapper( #Calculate this AND treat result as a TIME duration 
                         F("completed_at") - F("created_at"),
-                        output_field=DurationField()
+                        output_field=DurationField() #time basedc calculation
                     )
                 )
             )["avg"]
 
-            avg_hours = (avg_time.total_seconds() / 3600) if avg_time else 0
+            avg_hours = (avg_time.total_seconds() / 3600) if avg_time else 0 #convert second to hours
 
-            tasks = OverallWidgets._completed_tasks().filter(
-                workflow_instance__workflow_id=wf.workflow_id
+            tasks = OverallWidgets._completed_tasks().filter( #Get all completed tasks of this workflow
+                workflow_instance__workflow_id=wf.workflow_id #Task → WorkflowInstance → Workflow go through relationship to filter by workflow_id
             )
 
             total_tasks = tasks.count()
@@ -219,19 +219,16 @@ class OverallWidgets:
                 "instances": instance_count
             })
 
-        max_hours = max([m["avg_hours"] for m in metrics], default=1)
-
+        max_hours = max([m["avg_hours"] for m in metrics], default=1) #FIND MAX avg_hours FOR NORMALIZATION 
         result = []
-
         for m in metrics:
-
-            norm_time = m["avg_hours"] / max_hours
+            norm_time = m["avg_hours"] / max_hours #How slow is this workflow compared to slowest one If max_hours = 0 → division error
             norm_breach = m["breach_pct"] / 100
-            norm_volume = math.log(m["total_tasks"] + 1)
+            norm_volume = math.log(m["total_tasks"] + 1)   #compresses big numbers. log(1) = 0, log(10) = 2.3, log(100) = 4.6, log(1000) = 6.9 etc. Prevents high volume workflows from dominating the score
 
-            score = (0.45 * norm_time) + (0.45 * norm_breach) + (0.10 * norm_volume)
+            score = (0.45 * norm_time) + (0.45 * norm_breach) + (0.10 * norm_volume) #Hard-coded weights later we can move to settings
 
-            if m["instances"] < 2:
+            if m["instances"] < 2: #if workflow has only1 `instance`, reduce confidence by 50% because no enough hostory
                 score *= 0.5
 
             result.append({
@@ -240,11 +237,11 @@ class OverallWidgets:
                 "avg_completion_time_hours": round(m["avg_hours"], 2),
                 "breach_percentage": round(m["breach_pct"], 2),
                 "total_tasks": m["total_tasks"],
-                "completed_instances": m["instances"],
+                "completed_instances": m["instances"], #epa
                 "bottleneck_score": round(score, 4)
             })
 
-        return sorted(result, key=lambda x: x["bottleneck_score"], reverse=True)
+        return sorted(result, key=lambda x: x["bottleneck_score"], reverse=True) #worst1 to best0 score max to min 
 
     # =========================================================
     # USER PERFORMANCE (FIXED CONSISTENCY)
@@ -253,7 +250,7 @@ class OverallWidgets:
     def user_performance():
 
         data = OverallWidgets._completed_tasks().values(
-            "assigned_role_id"
+            "assigned_role_id" #completed tasks by  Group them by role (user role)
         ).annotate(
             total_tasks=Count("task_id"),
             breached_tasks=Count("task_id", filter=Q(sla_status="breached")),
@@ -271,14 +268,13 @@ class OverallWidgets:
         result = []
 
         for item in data:
-
             role_id = item["assigned_role_id"]
-            user = users.get(role_id)
+            user = users.get(role_id) #find which user belongs to this role
 
             total = item["total_tasks"]
             met = item["met_tasks"]
 
-            compliance = (met / total * 100) if total else 0
+            compliance = (met / total * 100) if total else 0 #How many tasks were completed successfully 
             avg_hours = (item["avg_time"].total_seconds() / 3600) if item["avg_time"] else 0
 
             result.append({
@@ -290,4 +286,4 @@ class OverallWidgets:
                 "sla_compliance": round(compliance, 2)
             })
 
-        return result
+        return sorted(result, key=lambda x: x["sla_compliance"], reverse=True) # best performer on top
