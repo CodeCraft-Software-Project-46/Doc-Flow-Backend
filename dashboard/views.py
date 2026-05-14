@@ -236,7 +236,7 @@ class ChangeDashboardStatus(APIView):
                 role=dashboard.role
             )
 
-            # only one dashboard exists → block disable
+            # only one dashboard exists , block disable
             if role_dashboards.count() == 1:
                 return Response({
                     "error": "Cannot disable the only dashboard. At least one active dashboard is required."
@@ -297,7 +297,7 @@ class DeleteDashboard(APIView):
             fallback.status = "active"
             fallback.save()
 
-        # DELETE DASHBOARD
+        # delete
         dashboard.delete()
 
         return Response({
