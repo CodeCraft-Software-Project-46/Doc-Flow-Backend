@@ -164,11 +164,11 @@ DEFAULT_FROM_EMAIL = 'DocFlow Notifications <caftcode@gmail.com>'
 
 # --- CORS SETTINGS ---
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",    # Standard Vite port
+    "http://localhost:5173",   
     "http://127.0.0.1:5173",
-    "http://localhost:3000",    # Just in case you are on port 3000
+    "http://localhost:3000",   
     "http://127.0.0.1:3000",
-    "http://localhost:8081",    # For React Expo mobile app
+    "http://localhost:8081",    
 ]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

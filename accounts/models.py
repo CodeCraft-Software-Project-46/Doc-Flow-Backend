@@ -1,12 +1,15 @@
+import sys
+
 from django.contrib.auth.models import User
 from django.db import models
+import sys
 
 class PermissionData(models.Model):
     permission_id = models.IntegerField(primary_key=True) # Matches 'user_permission' table
     permission_name = models.CharField(max_length=255)
 
     class Meta:
-        managed = False
+        managed = 'test' in sys.argv 
         db_table = 'user_permission'
 
     def __str__(self):

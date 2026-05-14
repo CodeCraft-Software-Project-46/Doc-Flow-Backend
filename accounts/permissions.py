@@ -15,8 +15,7 @@ class HasDynamicPermission(permissions.BasePermission):
         if request.user.is_superuser:
             return True
 
-        # 4. THE FIX: Trust the JWT!
-        # SimpleJWT decodes the token and puts it in request.auth
+        # 4. Check the token for permissions
         if request.auth and 'permissions' in request.auth:
             user_permissions = request.auth.get('permissions', [])
             
