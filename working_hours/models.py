@@ -17,7 +17,7 @@ class WorkingHoursConfig(models.Model): #class=table
     updated_at = models.DateTimeField(auto_now=True) #every time you save
 
     class Meta:
-        db_table = "working_hoursconfig"   # 👈 custom table name
+        db_table = "working_hoursconfig"   # custom table name
 
     def __str__(self):
         return f"Working Hours ({self.work_start_time} - {self.work_end_time})" #self means current object, this is just for better representation in admin panel and debugging

@@ -15,7 +15,7 @@ class GeminiProvider:
 
     def generate(self, prompt):
         response = self.client.models.generate_content( #send the prompt to the Gemini model and get the response
-            model="gemini-2.5-flash",     #gemini-3-flash-preview      gemini-2.5-flash
+            model="gemini-3-flash-preview",     #gemini-3-flash-preview      gemini-2.5-flash
             contents=prompt
         )
         return response.text.strip()

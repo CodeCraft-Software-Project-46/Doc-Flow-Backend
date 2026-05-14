@@ -11,9 +11,7 @@ from .serializers import WorkingHoursSerializer
 @api_view(['GET']) #This function ONLY accepts GET requests"
 def get_config(request):
     config = WorkingHoursConfig.objects.first() #fetch data from DB It takes ONE full row (first record)  Only ONE config for whole company
-    #print(config)
-    #print("*")
-    
+
     if not config: #If DB is empty: 
         return Response(                                 #{                   
             {"exists": False, "data": None},             #"exists": False, 
@@ -49,13 +47,6 @@ def save_config(request):
     #print(request)
     #print(request.data) #data from frontend
     config = WorkingHoursConfig.objects.first() #check if DB already has a record
-
-    # # If config exists → update it
-    # if config:
-    #     serializer = WorkingHoursSerializer(config, data=request.data)
-    # else:
-    #     # If not exists → create new row
-    #     serializer = WorkingHoursSerializer(data=request.data)
 
     if config:
         serializer = WorkingHoursSerializer(config, data=request.data, partial=True)  #partial=True → you can send only some fields
