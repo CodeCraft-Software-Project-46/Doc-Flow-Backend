@@ -13,8 +13,4 @@ def get_db_connection():
         database=os.getenv("DB_NAME")
     )
 
-# We manually connect to MySQL because:
-
-# ✔ no Django models
-# ✔ direct table access
-# ✔ flexible for testing
+# connect to the database and execute the query, return results as list of dicts

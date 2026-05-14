@@ -169,12 +169,10 @@ class OverallWidgets:
         met = completed.filter(sla_status="met").count()
         breached = completed.filter(sla_status="breached").count()
 
-        return {
-            "data": [
-                {"name": "met", "value": met},
-                {"name": "breached", "value": breached}
-            ]
-        }
+        return [
+            {"name": "met", "value": met},
+            {"name": "breached", "value": breached}
+        ]
 
     # =========================================================
     # BOTTLENECK WORKFLOWS (CLEAN + CONSISTENT)
