@@ -2,12 +2,11 @@ import re
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
 from rest_framework import serializers
-from django.contrib.auth import get_user_model
+
 from django.utils.crypto import get_random_string
 
-from user.models import Permission, Role, Department
+from user.models import Permission, Role, Department, User
 
-User = get_user_model()
 
 class PermissionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -19,32 +18,32 @@ class PermissionSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=False)
+   # password = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = User
         fields = [
             "id",
-            "username",
+            #"username",
             "name",
             "email",
             "contact_number",
             "address",
             "role",
-            "password",
+            #"password",
         ]
 
 
     def validate_username(self, value):
-        if not value or not value.strip():
-            raise serializers.ValidationError("Username is required.")
+        #if not value or not value.strip():
+            #raise serializers.ValidationError("Username is required.")
 
         # uniqueness (handle update)
-        user_id = self.instance.id if self.instance else None
-        if User.objects.filter(username=value).exclude(id=user_id).exists():
-            raise serializers.ValidationError("Username already exists.")
+        #user_id = self.instance.id if self.instance else None
+        #if User.objects.filter(username=value).exclude(id=user_id).exists():
+            #raise serializers.ValidationError("Username already exists.")
 
-        return value
+        return True
 
     def validate_name(self, value):
         if not value or not value.strip():
@@ -54,6 +53,9 @@ class UserSerializer(serializers.ModelSerializer):
     def validate_email(self, value):
         if not value:
             raise serializers.ValidationError("Email is required.")
+        user_id = self.instance.id if self.instance else None
+        if User.objects.filter(email=value).exclude(id=user_id).exists():
+            raise serializers.ValidationError("Email already exists.")
 
         try:
             validate_email(value)
@@ -101,12 +103,14 @@ class UserSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        temp_password = get_random_string(10)
+        #temp_password = get_random_string(10)
         user = User(**validated_data)
-        user.set_password(temp_password)
+        #user.set_password(temp_password)
+        temp_username = get_random_string(10)
+        user.username = temp_username
         user.save()
 
-        user.temp_password = temp_password
+        #user.temp_password = temp_password
         return user
 
     def update(self, instance, validated_data):

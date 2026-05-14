@@ -1,6 +1,9 @@
 import uuid
 
+from django.contrib.auth.hashers import make_password
+from django.utils.crypto import get_random_string
 from rest_framework import status
+
 
 from .serializers import UserSerializer, PermissionSerializer, RoleListSerializer, RoleSerializer, DepartmentSerializer
 from rest_framework.views import APIView
@@ -8,8 +11,9 @@ from rest_framework.response import Response
 
 from .models import Role, Permission, User, Department
 from .utils import send_user_credentials
+from django.apps import apps
 
-
+AuthUser = apps.get_model('auth', 'User')
 class GetAllPermissionsView(APIView):
     def get(self, request):
         permissions = Permission.objects.all()
@@ -98,11 +102,21 @@ class DeleteRoleView(APIView):
 class CreateUserView(APIView):
     def post(self, request):
         serializer = UserSerializer(data=request.data)
+        temp_password = get_random_string(10)
+
 
         if serializer.is_valid():
+
             user = serializer.save()
 
-            send_user_credentials(user,user.temp_password)
+            AuthUser.objects.create(
+                username=user.username,
+                email=user.email,
+                password=make_password(temp_password),
+                is_active=True
+            )
+
+            send_user_credentials(user,temp_password)
             return Response({
                 "message": "User created",
                 "temporary_password": getattr(user, "temp_password", None)
@@ -182,16 +196,34 @@ class UpdateDepartmentView(APIView):
             return Response({"message": "Department updated successfully"})
         return Response(serializer.errors, status=400)
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .models import Department, User
+
+
 class DeleteDepartmentView(APIView):
     def delete(self, request, pk):
         try:
             department = Department.objects.get(id=pk)
         except Department.DoesNotExist:
             return Response({"error": "Department not found"}, status=404)
-        if department.users.exists():
-            return Response("Cannot delete Department. Users have assigned to it",400)
+
+        # ✅ CHECK THROUGH ROLE → USER RELATION
+        has_users = User.objects.filter(
+            role__department=department
+        ).exists()
+
+        if has_users:
+            return Response(
+                {"error": "Cannot delete department. Users are assigned to roles."},
+                status=400
+            )
+
         department.delete()
-        return Response({"message": "Department deleted successfully"}, status=200)
+        return Response(
+            {"message": "Department deleted successfully"},
+            status=200
+        )
 
 
 

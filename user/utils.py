@@ -15,7 +15,7 @@ def send_user_credentials(user,temp_password, is_reset=False):
         login to the system:
         {"http://localhost:5173/"}
         """,
-        from_email="weragalasawani02@gmail.com",
+        from_email="caftcode@gmail.com",
         recipient_list=[user.email],
     )
 

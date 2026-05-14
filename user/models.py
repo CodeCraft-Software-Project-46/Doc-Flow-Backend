@@ -1,5 +1,4 @@
 import uuid
-from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 
@@ -53,13 +52,13 @@ class RolePermission(models.Model):
 
 
 
-class User(AbstractUser):
+class User(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     contact_number = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
     name = models.CharField(max_length=150, blank=True)
-
+    username=models.CharField(max_length=20,unique=True)
     role = models.OneToOneField(
         Role,
         on_delete=models.SET_NULL,
