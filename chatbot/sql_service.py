@@ -62,27 +62,50 @@ class SQLService:
                 query = query.replace(original, replacement)
 
         return query
+    
+    @staticmethod
+    def strip_sql_noise_words(query):
+        # 1. Strip structural noise words from the question text inside the query
+        noise_words = [
+            r"%\s*workflow\s*%",
+            r"%\s*instance\s*%",
+            r"%\s*task\s*%"
+        ]
+        for pattern in noise_words:
+            query = re.sub(pattern, "%", query, flags=re.IGNORECASE)
+        
+        # 2. Extract and tokenize ALL text strings inside single quotes (case-insensitive)
+        # This accurately targets strings like '%PO approval invoice A%' or '%purchase order%'
+        quoted_patterns = re.findall(r"'%([^']+)%'", query)
+        for pattern_text in quoted_patterns:
+            # Replace spaces with wildcard characters
+            tokenized = pattern_text.replace(" ", "%")
+            # Clean out structural duplicate wildcards
+            tokenized = re.sub(r"%+", "%", tokenized)
+            
+            original_string = f"'%{pattern_text}%'"
+            new_string = f"'%{tokenized}%'"
+            query = query.replace(original_string, new_string)
+
+        # 3. Final sanitization pass for double percentages across the entire block
+        query = re.sub(r"%+", "%", query)
+        return query
 
     @staticmethod
     def execute_query(query):
 
         query = SQLService.clean_sql(query)
-
         query = SQLService.enforce_case_insensitive(query)
-
+        query = SQLService.strip_sql_noise_words(query)
         SQLService.validate_query(query)
 
         print("\nFINAL SQL:")
         print(query)
 
         conn = get_db_connection() #Opens a connection to MySQL database
-
         cursor = conn.cursor(dictionary=True) #a tool that allows us to execute SQL queries and get results as Python dictionaries instead of tuples
-
         cursor.execute(query) 
-
         results = cursor.fetchall() #Collects ALL rows returned by query and Converts them into Python list
-
         conn.close()
 
         return results

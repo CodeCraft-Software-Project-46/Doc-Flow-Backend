@@ -9,51 +9,33 @@ from .sql_service import SQLService
 class ChatBotView(APIView):
 
     def post(self, request):
-
         user_message = request.data.get("message")
-
         if not user_message:
-            return Response(
-                {"error": "Message is required"},
-                status=400
-            )
+            return Response({"error": "Message is required"},status=400)
 
         try:
             llm = LLMService() #creates instance of LLM service and connects to Gemini AI
 
-            # ==============================
-            # STEP 0 — INTENT CHECK (NEW FIX)
-            # ==============================
-            intent_prompt = PromptService.is_sql_needed_prompt(user_message) #Extracts message from request
-            intent = llm.generate(intent_prompt).strip().upper()
+            # STEP 1: Combined Intent + SQL Generation (Saves 1 API Call)
+            # We use a combined prompt to ask: "Give me SQL or a Greeting"
+            system_prompt = PromptService.generate_sql_prompt(user_message)
+            llm_response = llm.generate(system_prompt).strip()
 
-            # If NOT a data question → return directly
-            if intent == "NO":
+            # Check if the LLM sent a greeting/fallback instead of SQL
+            if not llm_response.upper().startswith("SELECT"):
                 return Response({
-                    "answer": "Hi 👋 How can I help you with workflows or analytics today?",
+                    "answer": llm_response,
                     "data": [],
                     "generated_sql": None
                 })
 
-            # ==============================
-            # Generate SQL
-            # ==============================
-            sql_prompt = PromptService.generate_sql_prompt(user_message)
-            generated_sql = llm.generate(sql_prompt)
+            generated_sql = llm_response
 
-            # ==============================
-            # Execute SQL
-            # ==============================
+            # STEP 2: Execute SQL
             results = SQLService.execute_query(generated_sql)
 
-            # ==============================
-            # Generate natural language response
-            # ==============================
-            response_prompt = PromptService.generate_response_prompt(
-                user_message,
-                results
-            )
-
+            # STEP 3: Generate natural language response
+            response_prompt = PromptService.generate_response_prompt(user_message, results)
             final_answer = llm.generate(response_prompt)
 
             return Response({
