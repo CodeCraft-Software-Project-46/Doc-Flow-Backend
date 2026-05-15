@@ -17,7 +17,7 @@ class ChatBotView(APIView):
             llm = LLMService() #creates instance of LLM service and connects to Gemini AI
 
             # STEP 1: Combined Intent + SQL Generation (Saves 1 API Call)
-            # We use a combined prompt to ask: "Give me SQL or a Greeting"
+            # Generate a combined prompt to ask: "Give me SQL or a Greeting"
             system_prompt = PromptService.generate_sql_prompt(user_message)
             llm_response = llm.generate(system_prompt).strip()
 

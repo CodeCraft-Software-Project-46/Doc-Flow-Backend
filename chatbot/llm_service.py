@@ -23,6 +23,8 @@ class GeminiProvider:
             "gemini-2.0-flash",             # Tier 4: Highly cost-effective alternative general model
             "gemini-2.5-pro",               # Fallback 2 (Powerful pro model tier)
             "gemini-3-flash-preview"        # Fallback 3 (Experimental backup)
+            "gemini-3.1-flash-lite"
+            "gemini-2.5-flash-lite"
         ]
         
         last_exception = None
