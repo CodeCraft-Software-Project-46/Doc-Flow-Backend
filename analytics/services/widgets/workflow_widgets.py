@@ -4,29 +4,22 @@ from django.utils import timezone
 
 class WorkflowWidgets:
 
-    # =====================================================
-    # WHY: Frontend dropdown must only show meaningful workflows
-    # i.e., workflows that actually have execution data
-    # =====================================================
+#workflow list
     @staticmethod
     def available_workflows():
         return Workflow.objects.filter(
             instances__isnull=False
         ).distinct().values("workflow_id", "name")
 
-    # =====================================================
-    # WHY: KPI must reflect ACTIVE context of selected workflow
-    # =====================================================
+#running instances
     @staticmethod
-    def total_instances(workflow_id):
+    def running_instances(workflow_id):
         return WorkflowInstance.objects.filter(
             workflow_id=workflow_id,
             status="running"
         ).count()
 
-    # =====================================================
-    # WHY: completion time is only meaningful for completed instances
-    # =====================================================
+#average completion time
     @staticmethod
     def avg_completion_time(workflow_id):
 
@@ -46,9 +39,7 @@ class WorkflowWidgets:
             "avg_completion_time_hours": round(avg.total_seconds() / 3600, 2) if avg else 0
         }
 
-    # =====================================================
-    # WHY: SLA must reflect completed workflow executions only
-    # =====================================================
+#SLA compliance
     @staticmethod
     def sla_compliance(workflow_id):
 
@@ -66,10 +57,7 @@ class WorkflowWidgets:
             "percentage": round((met / total) * 100, 2) if total else 0
         }
 
-    # =====================================================
-    # WHY: Step flow is derived from TASK EXECUTION patterns
-    # NOT static workflow definition only
-    # =====================================================
+#workflow step flow
     @staticmethod
     def step_flow(workflow_id):
 
@@ -162,12 +150,10 @@ class WorkflowWidgets:
             "total_instances": total_instances,
             "completed_instances": completed_instances,
             "completion_rate": completion_rate,
-            "steps": steps #oneda mewa 
+            "steps": steps #
         }
 
-    # =====================================================
-    # WHY: Instance dropdown needs enriched context
-    # =====================================================
+#instances list
     @staticmethod
     def workflow_instances(workflow_id):
 
@@ -184,9 +170,7 @@ class WorkflowWidgets:
             "document_id"
         ))
 
-    # =====================================================
-    # WHY: Drilldown must show task-level execution clarity
-    # =====================================================
+#instance drilldown
     @staticmethod
     def instance_drilldown(instance_id):
 
@@ -198,11 +182,11 @@ class WorkflowWidgets:
 
         for t in tasks:
 
-            user = User.objects.filter(role_id=t.assigned_role_id).first()
+            user = User.objects.filter(role_id=t.assigned_role_id).first()#Find user & role
             role = Role.objects.filter(role_id=t.assigned_role_id).first()
 
             time_taken = None
-            if t.completed_at:
+            if t.completed_at:    #calculate time taken
                 diff = t.completed_at - t.created_at
                 time_taken = round(diff.total_seconds() / 3600, 2)
 

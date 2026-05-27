@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 #LLM Adapter layer
 
-# 2. Load the variables from .env
+#  Load the variables from .env
 load_dotenv()
 
 class GeminiProvider:                  
@@ -22,8 +22,8 @@ class GeminiProvider:
             "gemini-1.5-flash",             # Tier 3: Core stable legacy backup
             "gemini-2.0-flash",             # Tier 4: Highly cost-effective alternative general model
             "gemini-2.5-pro",               # Fallback 2 (Powerful pro model tier)
-            "gemini-3-flash-preview"        # Fallback 3 (Experimental backup)
-            "gemini-3.1-flash-lite"
+            "gemini-3-flash-preview",        # Fallback 3 (Experimental backup)
+            "gemini-3.1-flash-lite",
             "gemini-2.5-flash-lite"
         ]
         
@@ -34,7 +34,7 @@ class GeminiProvider:
                 print(f"🤖 Attempting prompt execution with model: {model_name}")
                 response = self.client.models.generate_content(
                     model=model_name,     
-                    contents=prompt
+                    contents=prompt 
                 )
                 # If successful, immediately return the text
                 return response.text.strip()

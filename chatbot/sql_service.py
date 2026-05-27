@@ -12,9 +12,16 @@ class SQLService:
         query = re.sub(r"```sql", "", query, flags=re.IGNORECASE) 
         query = re.sub(r"```", "", query)
 
-        # Remove semicolon
+        # Remove deletes trailing semicolons
         query = query.replace(";", "")
 
+        query = re.sub(
+                    r"(\w+)\.(lower|upper|trim)\(([^)]+)\)", 
+                    r"\2(\1.\3)", 
+                    query, 
+                    flags=re.IGNORECASE
+        )
+        
         # Remove extra spaces/newlines
         query = query.strip()
 
@@ -32,9 +39,9 @@ class SQLService:
             "TRUNCATE"
         ]
 
-        upper_query = query.upper()
+        upper_query = query.upper() # Convert to uppercase for case-insensitive checking
 
-        for keyword in blocked_keywords:
+        for keyword in blocked_keywords: # Check if any blocked keyword is present in the query
             if keyword in upper_query:
                 raise Exception("Dangerous query detected.")
 
@@ -57,9 +64,9 @@ class SQLService:
                     f"LOWER({column}) LIKE LOWER('%{value}%')" #flexible searching with LIKE and case insensitivity
                 )
 
-                original = f"{column} = '{value}'"
+                original = f"{column} = '{value}'" #original pattern
 
-                query = query.replace(original, replacement)
+                query = query.replace(original, replacement) #Replace original with new pattern in the query
 
         return query
     
@@ -87,7 +94,7 @@ class SQLService:
             new_string = f"'%{tokenized}%'"
             query = query.replace(original_string, new_string)
 
-        # 3. Final sanitization pass for double percentages across the entire block
+        # 3. remove any accidental multiple % characters that may have been introduced 
         query = re.sub(r"%+", "%", query)
         return query
 

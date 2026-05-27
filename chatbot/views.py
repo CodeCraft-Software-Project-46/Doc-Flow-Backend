@@ -16,7 +16,7 @@ class ChatBotView(APIView):
         try:
             llm = LLMService() #creates instance of LLM service and connects to Gemini AI
 
-            # STEP 1: Combined Intent + SQL Generation (Saves 1 API Call)
+            # STEP 1: Combined Intent + SQL Generation
             # Generate a combined prompt to ask: "Give me SQL or a Greeting"
             system_prompt = PromptService.generate_sql_prompt(user_message)
             llm_response = llm.generate(system_prompt).strip()
@@ -32,11 +32,11 @@ class ChatBotView(APIView):
             generated_sql = llm_response
 
             # STEP 2: Execute SQL
-            results = SQLService.execute_query(generated_sql)
+            results = SQLService.execute_query(generated_sql) #send to SQL service execute_query method to clean, validate, and run the SQL against DB and return results
 
             # STEP 3: Generate natural language response
-            response_prompt = PromptService.generate_response_prompt(user_message, results)
-            final_answer = llm.generate(response_prompt)
+            response_prompt = PromptService.generate_response_prompt(user_message, results) # send to prompt service to convert data into human readable response
+            final_answer = llm.generate(response_prompt)#generate response
 
             return Response({
                 "answer": final_answer,

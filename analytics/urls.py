@@ -4,7 +4,7 @@ from .views import *
 urlpatterns = [
 
     # ================= OVERALL =================
-    path("widgets/running-documents/", RunningDocumentsView.as_view()),      #creates an 
+    path("widgets/running-documents/", RunningDocumentsView.as_view()),      
     path("widgets/active-overdue-tasks/", ActiveOverdueTasksView.as_view()), #Class → becomes callable view function using .as_view()
     path("widgets/completed-tasks/", CompletedTasksView.as_view()),
     path("widgets/sla-compliance/", SLAComplianceView.as_view()),
@@ -16,7 +16,7 @@ urlpatterns = [
     path("widgets/workflows/", WorkflowListView.as_view()),
 
     # KPI widgets
-    path("widgets/workflow/<int:workflow_id>/total-instances/", WorkflowTotalInstancesView.as_view()),
+    path("widgets/workflow/<int:workflow_id>/running-instances/", WorkflowRunningInstancesView.as_view()),
     path("widgets/workflow/<int:workflow_id>/avg-completion-time/", WorkflowAvgCompletionTimeView.as_view()),
     path("widgets/workflow/<int:workflow_id>/sla-compliance/", WorkflowSLAComplianceView.as_view()),
 

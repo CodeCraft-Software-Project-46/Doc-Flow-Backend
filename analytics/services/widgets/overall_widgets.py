@@ -5,36 +5,32 @@ from analytics.models import TaskInstance, WorkflowInstance, Workflow, User, Rol
 
 class OverallWidgets:
 
-    # =========================================================
-    # reusable base query methods to reduce code duplication and ensure consistency
-    # =========================================================
+# reused methods
     @staticmethod
-    def _completed_tasks():
+    def completed_tasks():
         return TaskInstance.objects.filter(
             status="completed",
             completed_at__isnull=False
         )
 
     @staticmethod
-    def _completed_workflow_instances():
+    def completed_workflow_instances():
         return WorkflowInstance.objects.filter(
             status="completed",
             completed_at__isnull=False
         )
-
-    # =========================================================
+    
     # RUNNING DOCUMENTS
-    # =========================================================
     @staticmethod
     def running_documents():
 
         workflows = {}
-        for workflow in Workflow.objects.all(): #creates dictionary entries
+        for workflow in Workflow.objects.all(): #Create workflows Dictionary to get workflow name by id for results dictionary
             workflows[workflow.workflow_id] = workflow.name         #{
                                                                     #     1: "Leave Approval",
                                                                     #     2: "Invoice Workflow"
                                                                     # }
-        documents = {}
+        documents = {}                       #Create documents Dictionary to get document name by id for results
         for document in Document.objects.all():
             documents[document.document_id] = document.document_name
 
@@ -47,7 +43,7 @@ class OverallWidgets:
         for inst in instances:
             running_hours = 0
             if inst.created_at:
-                running_hours = (now - inst.created_at).total_seconds() / 3600
+                running_hours = (now - inst.created_at).total_seconds() / 3600 #Get Running Hours
 
             result.append({
                 "instance_id": inst.instance_id,
@@ -66,18 +62,16 @@ class OverallWidgets:
             "documents": result
         }
 
-    # =========================================================
     # ACTIVE OVERDUE TASKS
-    # =========================================================
     @staticmethod
     def active_overdue_tasks():
 
         now = timezone.now()
-        queryset = TaskInstance.objects.filter(
+        queryset = TaskInstance.objects.filter( #Get all tasks that are overdue
             sla_status="breached"
         ).exclude(status="completed")
 
-        workflows = {}
+        workflows = {} #Create workflows Dictionary to get workflow name by id for results dictionary
         for workflow in Workflow.objects.all():
             workflows[workflow.workflow_id] = workflow.name
 
@@ -100,7 +94,7 @@ class OverallWidgets:
         result = []
 
         for task in queryset:
-            wf_instance = task.workflow_instance
+            wf_instance = task.workflow_instance #Get workflow instance of this task to access workflow_id and document_id for results list
             user = users.get(task.assigned_role_id)
             overdue_hours = None
             overdue_days = None
@@ -114,7 +108,7 @@ class OverallWidgets:
                 "task_id": task.task_id,
                 "task_name": task.task_name,
                 "status": task.status,
-                "due_at": task.due_at,# epaa
+                "due_at": task.due_at,
                 "instance_name": wf_instance.instance_name,
                 "workflow_name": workflows.get(wf_instance.workflow_id),
                 "document_name": documents.get(wf_instance.document_id),
@@ -130,22 +124,20 @@ class OverallWidgets:
             "tasks": result
         }
 
-    # =========================================================
+
     # COMPLETED TASKS
-    # =========================================================
     @staticmethod
-    def completed_tasks():
+    def completed_tasks_count():
         return {
-            "count": OverallWidgets._completed_tasks().count()
+            "count": OverallWidgets.completed_tasks().count()
         }
 
-    # =========================================================
-    # SLA COMPLIANCE (FIXED CONSISTENCY)
-    # =========================================================
+
+    # SLA COMPLIANCE 
     @staticmethod
     def sla_compliance():
 
-        completed = OverallWidgets._completed_tasks()
+        completed = OverallWidgets.completed_tasks()
 
         total = completed.count()
         met = completed.filter(sla_status="met").count()
@@ -158,13 +150,11 @@ class OverallWidgets:
             "percentage": percentage
         }
 
-    # =========================================================
-    # SLA DISTRIBUTION (FIXED CONSISTENCY)
-    # =========================================================
+    # SLA DISTRIBUTION 
     @staticmethod
     def sla_distribution():
 
-        completed = OverallWidgets._completed_tasks()
+        completed = OverallWidgets.completed_tasks()
 
         met = completed.filter(sla_status="met").count()
         breached = completed.filter(sla_status="breached").count()
@@ -174,17 +164,16 @@ class OverallWidgets:
             {"name": "breached", "value": breached}
         ]
 
-    # =========================================================
-    # BOTTLENECK WORKFLOWS (CLEAN + CONSISTENT)
-    # =========================================================
+    # BOTTLENECK WORKFLOWS
     @staticmethod
     def bottleneck_workflows():
 
-        workflows = Workflow.objects.all()
-        metrics = []
+        workflows = Workflow.objects.all() #Get all workflows
+        metrics = [] #Create a empty list to store results
 
         for wf in workflows:
-            instances = OverallWidgets._completed_workflow_instances().filter( #Get all completed instances of this workflow
+
+            instances = OverallWidgets.completed_workflow_instances().filter( #Get all completed instances of this workflow
                 workflow_id=wf.workflow_id
             )
             instance_count = instances.count()
@@ -193,14 +182,14 @@ class OverallWidgets:
                 avg=Avg(
                     ExpressionWrapper( #Calculate this AND treat result as a TIME duration 
                         F("completed_at") - F("created_at"),
-                        output_field=DurationField() #time basedc calculation
+                        output_field=DurationField() #time based calculation
                     )
                 )
             )["avg"]
 
             avg_hours = (avg_time.total_seconds() / 3600) if avg_time else 0 #convert second to hours
 
-            tasks = OverallWidgets._completed_tasks().filter( #Get all completed tasks of this workflow
+            tasks = OverallWidgets.completed_tasks().filter( #Get all completed tasks of this workflow
                 workflow_instance__workflow_id=wf.workflow_id #Task → WorkflowInstance → Workflow go through relationship to filter by workflow_id
             )
 
@@ -235,22 +224,20 @@ class OverallWidgets:
                 "avg_completion_time_hours": round(m["avg_hours"], 2),
                 "breach_percentage": round(m["breach_pct"], 2),
                 "total_tasks": m["total_tasks"],
-                "completed_instances": m["instances"], #epa
+                "completed_instances": m["instances"], #
                 "bottleneck_score": round(score, 4)
             })
 
         return sorted(result, key=lambda x: x["bottleneck_score"], reverse=True) #worst1 to best0 score max to min 
 
-    # =========================================================
-    # USER PERFORMANCE (FIXED CONSISTENCY)
-    # =========================================================
+    # USER PERFORMANCE 
     @staticmethod
     def user_performance():
 
-        data = OverallWidgets._completed_tasks().values(
-            "assigned_role_id" #completed tasks by  Group them by role (user role)
-        ).annotate(
-            total_tasks=Count("task_id"),
+        data = OverallWidgets.completed_tasks().values(
+            "assigned_role_id" #completed tasks Group them by role (user role)
+        ).annotate( #calculate metrics per role
+            total_tasks=Count("task_id"), # total completed tasks assigned to this role
             breached_tasks=Count("task_id", filter=Q(sla_status="breached")),
             met_tasks=Count("task_id", filter=Q(sla_status="met")),
             avg_time=Avg(
@@ -261,7 +248,7 @@ class OverallWidgets:
             )
         )
 
-        users = {u.role_id: u for u in User.objects.all()}
+        users = {u.role_id: u for u in User.objects.all()}#Create users Dictionary to get user details by role_id for results dictionary
 
         result = []
 

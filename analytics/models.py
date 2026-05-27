@@ -37,7 +37,7 @@ class User(models.Model):
 
     class Meta:
         managed = False
-        db_table = "analytics_user"    #Django will NOT create or modify tables You're using an existing database just reading existing tables... 
+        db_table = "analytics_user"    #Django will NOT create or modify tables we're using an existing database just reading existing tables... 
 
 class Document(models.Model):
     document_id = models.AutoField(primary_key=True)
