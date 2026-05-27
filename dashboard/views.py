@@ -320,6 +320,7 @@ class GetActiveDashboard(APIView):
                 status=404
             )
 
+# to get  widgets related to dashboard object
         widgets = DashboardWidget.objects.filter(
             dashboard=dashboard
         )
