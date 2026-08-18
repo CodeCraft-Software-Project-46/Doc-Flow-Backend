@@ -144,12 +144,22 @@ class UpdateUserView(APIView):
 
 class DeleteUserView(APIView):
     def delete(self, request, pk):
+
         try:
             user = User.objects.get(id=pk)
+
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=404)
 
-        user.delete()
+        try:
+            authUser = AuthUser.objects.get(username=user.username)
+            authUser.is_active = False
+            authUser.save()
+            user.delete()
+        except ImportError:
+            return Response({"error":"Error in deleting user"})
+        print(user.username)
+
 
         return Response({"message": "User deleted successfully"}, status=200)
 
