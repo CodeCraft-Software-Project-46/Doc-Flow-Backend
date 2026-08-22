@@ -11,6 +11,11 @@ urlpatterns = [
     path("widgets/sla-distribution/", SLADistributionView.as_view()),
     path("widgets/bottleneck-workflows/", BottleneckWorkflowsView.as_view()),
     path("widgets/user-performance/", UserPerformanceView.as_view()),
+    path("widgets/users/", UserListView.as_view()),
+    path("widgets/my-performance/", MyPerformanceView.as_view()),
+
+    # ================= CONFIG =================
+    path("config/bottleneck-weights/", BottleneckWeightsConfigView.as_view()),
 
     # ================= WORKFLOW =================
     path("widgets/workflows/", WorkflowListView.as_view()),

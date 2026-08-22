@@ -1,24 +1,34 @@
 import math
 from django.utils import timezone
 from django.db.models import Avg, Count, Q, F, ExpressionWrapper, DurationField
-from analytics.models import TaskInstance, WorkflowInstance, Workflow, User, Role, Document, Department
+from analytics.models import TaskInstance, WorkflowInstance, Workflow, User, Role, Document, Department, BottleneckScoreWeights
 
 class OverallWidgets:
 
 # reused methods
     @staticmethod
-    def completed_tasks():
-        return TaskInstance.objects.filter(
+    def completed_tasks(date_from=None, date_to=None):
+        qs = TaskInstance.objects.filter(
             status="completed",
             completed_at__isnull=False
         )
+        if date_from: #filter by completion date, not creation date, so the time range reflects when work actually finished
+            qs = qs.filter(completed_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(completed_at__date__lte=date_to)
+        return qs
 
     @staticmethod
-    def completed_workflow_instances():
-        return WorkflowInstance.objects.filter(
+    def completed_workflow_instances(date_from=None, date_to=None):
+        qs = WorkflowInstance.objects.filter(
             status="completed",
             completed_at__isnull=False
         )
+        if date_from:
+            qs = qs.filter(completed_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(completed_at__date__lte=date_to)
+        return qs
     
     # RUNNING DOCUMENTS
     @staticmethod
@@ -127,17 +137,17 @@ class OverallWidgets:
 
     # COMPLETED TASKS
     @staticmethod
-    def completed_tasks_count():
+    def completed_tasks_count(date_from=None, date_to=None):
         return {
-            "count": OverallWidgets.completed_tasks().count()
+            "count": OverallWidgets.completed_tasks(date_from, date_to).count()
         }
 
 
-    # SLA COMPLIANCE 
+    # SLA COMPLIANCE
     @staticmethod
-    def sla_compliance():
+    def sla_compliance(date_from=None, date_to=None):
 
-        completed = OverallWidgets.completed_tasks()
+        completed = OverallWidgets.completed_tasks(date_from, date_to)
 
         total = completed.count()
         met = completed.filter(sla_status="met").count()
@@ -146,15 +156,15 @@ class OverallWidgets:
 
         return {
             "total": total,
-            "met": met, #epa 
+            "met": met, #epa
             "percentage": percentage
         }
 
-    # SLA DISTRIBUTION 
+    # SLA DISTRIBUTION
     @staticmethod
-    def sla_distribution():
+    def sla_distribution(date_from=None, date_to=None):
 
-        completed = OverallWidgets.completed_tasks()
+        completed = OverallWidgets.completed_tasks(date_from, date_to)
 
         met = completed.filter(sla_status="met").count()
         breached = completed.filter(sla_status="breached").count()
@@ -166,14 +176,14 @@ class OverallWidgets:
 
     # BOTTLENECK WORKFLOWS
     @staticmethod
-    def bottleneck_workflows():
+    def bottleneck_workflows(date_from=None, date_to=None):
 
         workflows = Workflow.objects.all() #Get all workflows
         metrics = [] #Create a empty list to store results
 
         for wf in workflows:
 
-            instances = OverallWidgets.completed_workflow_instances().filter( #Get all completed instances of this workflow
+            instances = OverallWidgets.completed_workflow_instances(date_from, date_to).filter( #Get all completed instances of this workflow
                 workflow_id=wf.workflow_id
             )
             instance_count = instances.count()
@@ -189,7 +199,7 @@ class OverallWidgets:
 
             avg_hours = (avg_time.total_seconds() / 3600) if avg_time else 0 #convert second to hours
 
-            tasks = OverallWidgets.completed_tasks().filter( #Get all completed tasks of this workflow
+            tasks = OverallWidgets.completed_tasks(date_from, date_to).filter( #Get all completed tasks of this workflow
                 workflow_instance__workflow_id=wf.workflow_id #Task → WorkflowInstance → Workflow go through relationship to filter by workflow_id
             )
 
@@ -206,14 +216,15 @@ class OverallWidgets:
                 "instances": instance_count
             })
 
-        max_hours = max([m["avg_hours"] for m in metrics], default=1) #FIND MAX avg_hours FOR NORMALIZATION 
+        max_hours = max([m["avg_hours"] for m in metrics], default=1) or 1 #FIND MAX avg_hours FOR NORMALIZATION; guard against all-zero avg_hours (e.g. no instances completed in a narrow date range)
+        time_weight, breach_weight, volume_weight = BottleneckScoreWeights.current().normalized() #configurable via admin / BottleneckScoreWeights, defaults to 0.45/0.45/0.10
         result = []
         for m in metrics:
             norm_time = m["avg_hours"] / max_hours #How slow is this workflow compared to slowest one If max_hours = 0 → division error
             norm_breach = m["breach_pct"] / 100
             norm_volume = math.log(m["total_tasks"] + 1)   #compresses big numbers. log(1) = 0, log(10) = 2.3, log(100) = 4.6, log(1000) = 6.9 etc. Prevents high volume workflows from dominating the score
 
-            score = (0.45 * norm_time) + (0.45 * norm_breach) + (0.10 * norm_volume) #Hard-coded weights later we can move to settings
+            score = (time_weight * norm_time) + (breach_weight * norm_breach) + (volume_weight * norm_volume)
 
             if m["instances"] < 2: #if workflow has only1 `instance`, reduce confidence by 50% because no enough hostory
                 score *= 0.5
@@ -230,11 +241,128 @@ class OverallWidgets:
 
         return sorted(result, key=lambda x: x["bottleneck_score"], reverse=True) #worst1 to best0 score max to min 
 
-    # USER PERFORMANCE 
+    # AVAILABLE USERS (for the "My Performance" widget's user picker)
     @staticmethod
-    def user_performance():
+    def available_users():
+        return list(User.objects.order_by("user_name").values("user_id", "user_name"))
 
-        data = OverallWidgets.completed_tasks().values(
+    # MY PERFORMANCE — single user's task history + SLA trend + motivational message
+    @staticmethod
+    def my_performance(user_id, date_from=None, date_to=None):
+
+        user = User.objects.filter(user_id=user_id).first()
+        if not user:
+            return None
+
+        # Tasks are attributed by role (see user_performance/instance_drilldown above —
+        # TaskInstance has no user FK, only assigned_role_id), so this reflects the
+        # signed-in user's role, not a strictly personal assignment.
+        tasks = OverallWidgets.completed_tasks(date_from, date_to).filter(
+            assigned_role_id=user.role_id
+        ).select_related("workflow_instance", "workflow_instance__workflow").order_by("completed_at")
+
+        task_rows = []
+        daily = {}  # date -> {"total": n, "breached": n}
+
+        for t in tasks:
+            wf_instance = t.workflow_instance
+            workflow = wf_instance.workflow if wf_instance else None
+
+            time_taken = None
+            if t.completed_at:
+                diff = t.completed_at - t.created_at
+                time_taken = round(diff.total_seconds() / 3600, 2)
+
+            task_rows.append({
+                "task_name": t.task_name,
+                "workflow_name": workflow.name if workflow else None,
+                "instance_name": wf_instance.instance_name if wf_instance else None,
+                "sla_hours": t.sla_hours,
+                "time_taken_hours": time_taken,
+                "sla_status": t.sla_status,
+                "completed_at": t.completed_at,
+            })
+
+            if t.completed_at:
+                day = t.completed_at.date().isoformat()
+                bucket = daily.setdefault(day, {"total": 0, "breached": 0})
+                bucket["total"] += 1
+                if t.sla_status == "breached":
+                    bucket["breached"] += 1
+
+        total = len(task_rows)
+        met = sum(1 for r in task_rows if r["sla_status"] == "met")
+        breached = sum(1 for r in task_rows if r["sla_status"] == "breached")
+        met_pct = round((met / total * 100), 2) if total else 0
+        breach_pct = round((breached / total * 100), 2) if total else 0
+
+        durations = [r["time_taken_hours"] for r in task_rows if r["time_taken_hours"] is not None]
+        avg_time = round(sum(durations) / len(durations), 2) if durations else 0
+
+        trend = [
+            {
+                "date": day,
+                "total_tasks": bucket["total"],
+                "breached_tasks": bucket["breached"],
+                "breach_percentage": round(bucket["breached"] / bucket["total"] * 100, 2),
+            }
+            for day, bucket in sorted(daily.items())
+        ]
+
+        # Motivation: compare the breach rate across the first vs second half of the
+        # days with activity in this range, so the widget can nudge the user toward
+        # a downward trend rather than just showing a static snapshot.
+        motivation = {
+            "trend_direction": "insufficient_data",
+            "first_half_avg": None,
+            "second_half_avg": None,
+            "delta": None,
+        }
+
+        if len(trend) >= 2:
+            mid = len(trend) // 2
+            first_half = trend[:mid]
+            second_half = trend[mid:]
+
+            first_avg = sum(d["breach_percentage"] for d in first_half) / len(first_half)
+            second_avg = sum(d["breach_percentage"] for d in second_half) / len(second_half)
+            delta = round(second_avg - first_avg, 2)
+
+            if delta < -0.5:
+                direction = "improving"
+            elif delta > 0.5:
+                direction = "worsening"
+            else:
+                direction = "stable"
+
+            motivation = {
+                "trend_direction": direction,
+                "first_half_avg": round(first_avg, 2),
+                "second_half_avg": round(second_avg, 2),
+                "delta": delta,
+            }
+
+        return {
+            "user_id": user.user_id,
+            "user_name": user.user_name,
+            "summary": {
+                "total_tasks": total,
+                "met_tasks": met,
+                "breached_tasks": breached,
+                "met_percentage": met_pct,
+                "breach_percentage": breach_pct,
+                "avg_time_taken_hours": avg_time,
+            },
+            "tasks": task_rows,
+            "trend": trend,
+            "motivation": motivation,
+        }
+
+    # USER PERFORMANCE
+    @staticmethod
+    def user_performance(date_from=None, date_to=None):
+
+        data = OverallWidgets.completed_tasks(date_from, date_to).values(
             "assigned_role_id" #completed tasks Group them by role (user role)
         ).annotate( #calculate metrics per role
             total_tasks=Count("task_id"), # total completed tasks assigned to this role

@@ -14,4 +14,4 @@ from .models import WorkingHoursConfig
 
 @admin.register(WorkingHoursConfig)    #Show this table in admin panel so I can view/edit data
 class WorkingHoursConfigAdmin(admin.ModelAdmin):
-    list_display = ("work_start_time", "work_end_time", "time_zone", "updated_at")
+    list_display = ("work_start_time", "work_end_time", "updated_at")

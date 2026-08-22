@@ -27,6 +27,29 @@ class WorkingHoursSerializer(serializers.ModelSerializer):
                 )
         return value
 
+    # A start/end time that isn't a real window (start after end, or the
+    # same time for both) would let the SLA engine compute a due date of
+    # zero-or-negative available hours per day. calculate_due_at() already
+    # refuses that with an error — this stops the bad config from ever
+    # being saved in the first place, instead of only failing later when a
+    # task happens to need its deadline calculated.
+    def validate(self, attrs):
+        start = attrs.get(
+            "work_start_time",
+            getattr(self.instance, "work_start_time", None),
+        )
+        end = attrs.get(
+            "work_end_time",
+            getattr(self.instance, "work_end_time", None),
+        )
+
+        if start is not None and end is not None and start >= end:
+            raise serializers.ValidationError(
+                "work_start_time must be earlier than work_end_time."
+            )
+
+        return attrs
+
 #Database object ↔ JSON
 # | Direction    | Purpose            |
 # | ------------ | ------------------ |

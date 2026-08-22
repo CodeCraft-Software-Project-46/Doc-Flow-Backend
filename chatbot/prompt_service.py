@@ -41,7 +41,28 @@ class PromptService:
         """
 
     @staticmethod
-    def generate_response_prompt(question, data): #Convert data → human-readable response
+    def generate_response_prompt(question, data, context_snippets=None): #Convert data → human-readable response
+
+        context_block = ""
+        if context_snippets:
+            joined = "\n---\n".join(context_snippets)
+            context_block = f"""
+
+        ADDITIONAL CONTEXT (retrieved workflow/document background, use only if directly relevant):
+        {joined}
+        """
+
+        # An empty DATA list only means "nothing found" when there's also no
+        # retrieved context to fall back on -- when context_snippets is
+        # populated, DATA is deliberately empty (there was no SQL result) and
+        # the context IS the answer, so the "say no matching records" rule
+        # must not apply, or the model reports "no records" while ignoring
+        # the context that was just handed to it.
+        empty_data_rule = (
+            "- If the DATA list is empty and there is no ADDITIONAL CONTEXT section above, strictly output: 'No matching records found'."
+            if not context_snippets else
+            "- DATA is intentionally empty here; base your answer entirely on the ADDITIONAL CONTEXT section above instead. Do not say no records were found."
+        )
 
         return f"""
         You are a professional analytics assistant.
@@ -51,6 +72,7 @@ class PromptService:
 
         DATA:
         {data}
+        {context_block}
 
         TASK:
         Convert the raw data set into a highly readable, clean, human-friendly text response.
@@ -65,6 +87,7 @@ class PromptService:
         - Use proper clean structural line breaks.
         - Present analytical list components using plain dash bullet points (- ).
         - Do NOT expose SQL string code blocks, structural keys, or raw system exceptions to the user.
-        - If the dataset array is empty, strictly output: 'No matching records found'.
+        {empty_data_rule}
         - If the dataset array indicates an unexpected error flag, output: 'Unable to fetch data at the moment'.
+        - When the DATA list is non-empty, every entry in it is a real record that must be described in your answer. Never claim there is no data, no result, or nothing found in that case.
         """

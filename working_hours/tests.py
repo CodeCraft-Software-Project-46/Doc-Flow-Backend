@@ -98,26 +98,42 @@ class WorkingHoursTests(TestCase):
         }
 
         response = self.client.post(self.url, data, format="json")
-        
-        # depends: if backend validates → 400
-        # currently your backend DOES NOT validate this → will pass
-        
+
+        # A start/end time that isn't a real window would let the SLA
+        # engine compute a due date with zero available hours per day, and
+        # calculate_due_at() raises for exactly that. The serializer now
+        # rejects it up front instead.
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_start_after_end_time(self):
+        data = {
+            "work_start_time": "17:00:00",
+            "work_end_time": "09:00:00",
+            "work_days": [1],
+            "holidays": [],
+            "time_zone": "UTC",
+        }
+
+        response = self.client.post(self.url, data, format="json")
+
+        # Same reasoning as test_same_start_end_time, just the other way
+        # the window can be invalid: start later than end.
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    #Duplicate holidays
+    def test_duplicate_holidays(self):
+        data = {
+            "work_start_time": "09:00:00",
+            "work_end_time": "17:00:00",
+            "work_days": [1],
+            "holidays": ["2025-01-01", "2025-01-01"],
+            "time_zone": "UTC"
+        }
+
+        response = self.client.post(self.url, data, format="json")
+
+        # backend currently allows this
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        #Duplicate holidays 
-        def test_duplicate_holidays(self):
-            data = {
-                "work_start_time": "09:00:00",
-                "work_end_time": "17:00:00",
-                "work_days": [1],
-                "holidays": ["2025-01-01", "2025-01-01"],
-                "time_zone": "UTC"
-            }
-
-            response = self.client.post(self.url, data, format="json")
-
-            # backend currently allows this
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
 # python manage.py test working_hours

@@ -10,10 +10,11 @@ class WorkingHoursConfig(models.Model): #class=table
 
     # store array as JSON
     work_days = models.JSONField(default=list) #[1,2,3,4,5]
-    holidays = models.JSONField(default=list) #["2026-01-01", "2026-12-25"] 
+    holidays = models.JSONField(default=list) #["2026-01-01", "2026-12-25"]
 
-    time_zone = models.CharField(max_length=50, default="UTC") #"UTC"
-
+    # No per-row time_zone: the system only ever runs in Sri Lanka, so the
+    # working-hours calendar is always interpreted in Asia/Colombo (see
+    # sla.services.sla_calculator.PROJECT_TIME_ZONE).
     updated_at = models.DateTimeField(auto_now=True) #every time you save
 
     class Meta:
