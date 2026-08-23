@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 import uuid
+from django.utils import timezone
+
 
 class DocumentType(models.Model):
 #  Tabble to categorize documents (e.g., Invoice, Contract, Report)
@@ -208,4 +210,28 @@ class ExternalWorkflowInstance(models.Model):
     class Meta:
         managed = False # CRITICAL: Keeps your migrations safe
         db_table = 'workflows_workflowinstance'
-    
+
+class DocumentUploadLink(models.Model):
+    """Stores secure, tokenized links for external document uploads."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Routing metadata embedded in the link
+    document_type = models.ForeignKey(DocumentType, on_delete=models.CASCADE)
+    workflow_id = models.CharField(max_length=255)
+
+    # Security controls
+    is_revoked = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    def is_valid(self):
+        """Checks if the link is active and not expired."""
+        if self.is_revoked:
+            return False
+        if timezone.now() > self.expires_at:
+            return False
+        return True
+
+    class Meta:
+        db_table = 'document_upload_links'
+

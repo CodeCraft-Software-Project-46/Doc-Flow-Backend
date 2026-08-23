@@ -12,5 +12,11 @@ urlpatterns = [ # Define URL patterns for the documents app, linking to the appr
     path('list/', views.DocumentListView.as_view(), name='document-list'),
     path('types/<int:pk>/', DocumentTypeDetailView.as_view(), name='document-type-detail'),
 
+    path('upload-links/', views.ListUploadLinksView.as_view(), name='list-upload-links'),
+    path('upload-links/generate/', views.GenerateUploadLinkView.as_view(), name='generate-upload-link'),
+    path('upload-links/<uuid:link_id>/revoke/', views.RevokeUploadLinkView.as_view(), name='revoke-upload-link'),
+    path('upload-links/<uuid:link_id>/upload/', views.LinkBasedUploadView.as_view(), name='link-based-upload'),
+
+
 
 ]

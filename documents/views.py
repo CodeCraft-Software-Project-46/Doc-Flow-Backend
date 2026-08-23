@@ -3,10 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import Document, DocumentType, ManualUploadDocument, ExternalWorkflow, ExternalWorkflowInstance
-from rest_framework.permissions import AllowAny
 from .models import GDriveFolderMapping, ExternalWorkflow
 from .gdrive_service import GDriveService
-from rest_framework.permissions import AllowAny
 from rest_framework import status, generics
 from .serializers import DocumentTypeSerializer, DocumentSerializer
 import json
@@ -14,6 +12,12 @@ from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from .s3_service import S3Service
 from .ai_service import DocumentAIService
+
+import datetime
+from rest_framework.permissions import AllowAny, IsAuthenticated
+
+from .models import DocumentUploadLink
+
   
 
 class ManualUploadView(APIView):
@@ -214,3 +218,156 @@ def get_upload_dropdowns(request):
         
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
+
+class GenerateUploadLinkView(APIView):
+    """Internal API: Creates a new secure upload link."""
+    # Temporarily AllowAny for testing, change to IsAuthenticated later
+    permission_classes = [AllowAny] 
+
+    def post(self, request):
+        doc_type_id = request.data.get('document_type_id')
+        workflow_id = request.data.get('workflow_id')
+        expiry_days = int(request.data.get('expiry_days', 7)) # Defaults to 7 days
+
+        if not doc_type_id or not workflow_id:
+            return Response({"error": "document_type_id and workflow_id are required."}, status=400)
+
+        try:
+            doc_type = DocumentType.objects.get(id=doc_type_id)
+            expires_at = timezone.now() + datetime.timedelta(days=expiry_days)
+            
+            upload_link = DocumentUploadLink.objects.create(
+                document_type=doc_type,
+                workflow_id=str(workflow_id),
+                expires_at=expires_at
+            )
+            
+            # Construct the external-facing URL (Adjust port/domain as needed)
+            link_url = f"http://localhost:5173/external-upload/{upload_link.id}"
+            
+            return Response({
+                "message": "Upload link generated successfully.",
+                "link_id": upload_link.id,
+                "url": link_url,
+                "expires_at": expires_at
+            }, status=201)
+            
+        except DocumentType.DoesNotExist:
+            return Response({"error": "Invalid Document Type."}, status=400)
+
+
+class RevokeUploadLinkView(APIView):
+    """Internal API: Kills an active upload link."""
+    permission_classes = [AllowAny]
+
+    def post(self, request, link_id):
+        try:
+            upload_link = DocumentUploadLink.objects.get(id=link_id)
+            upload_link.is_revoked = True
+            upload_link.save()
+            return Response({"message": "Link has been successfully revoked."})
+        except DocumentUploadLink.DoesNotExist:
+            return Response({"error": "Link not found."}, status=404)
+
+
+class LinkBasedUploadView(APIView):
+    """External API: Handles the actual file upload using the UUID token."""
+    parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [AllowAny] # Must be AllowAny for external vendors
+
+    def post(self, request, link_id):
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({"error": "File is required."}, status=400)
+
+        try:
+            # 1. Validate the Token
+            upload_link = DocumentUploadLink.objects.get(id=link_id)
+            if not upload_link.is_valid():
+                return Response({"error": "This upload link is expired or has been revoked."}, status=403)
+
+            doc_type = upload_link.document_type
+            
+            # 2. Strict File Type Validation
+            file_ext = file_obj.name.split('.')[-1].lower()
+            allowed_exts = [ext.strip().lower() for ext in doc_type.allowed_extensions.split(',')]
+            if file_ext not in allowed_exts:
+                return Response({"error": f"Invalid format. Allowed: {doc_type.allowed_extensions}"}, status=400)
+
+            # 3. SHA-256 Duplicate Check
+            file_content = file_obj.read()
+            file_hash = hashlib.sha256(file_content).hexdigest()
+            if Document.objects.filter(file_hash=file_hash).exists():
+                return Response({"error": "This document has already been uploaded."}, status=409)
+
+            # 4. S3 Upload & AI Summarization
+            mime_type = file_obj.content_type
+            file_name = file_obj.name
+            
+            s3_service = S3Service()
+            ai_service = DocumentAIService()
+            
+            s3_url = s3_service.upload_file_bytes(file_content, file_name, mime_type)
+            summary_text = ai_service.generate_summary(file_content, mime_type)
+
+            # 5. Save Core Document
+            new_doc = Document.objects.create(
+                document_name=file_name,
+                document_type=doc_type,
+                source='api_link',
+                current_status='uploaded',
+                file_hash=file_hash,
+                ai_summary=summary_text,
+                s3_url=s3_url
+            )
+
+            # 6. Trigger the Workflow Engine Handshake
+            ExternalWorkflowInstance.objects.create(
+                workflow_id=upload_link.workflow_id,
+                document_name=new_doc.document_name,
+                document_type=doc_type.type_name,
+                status='RUNNING',
+                current_state='Start',
+                created_at=timezone.now(),
+                updated_at=timezone.now(),
+                started_at=timezone.now(),
+                payload=json.dumps({
+                    "document_id": str(new_doc.id),
+                    "source": "External Link Upload",
+                    "ai_summary": summary_text
+                }),
+                runtime_state="{}"
+            )
+
+            return Response({
+                "message": "File securely uploaded and workflow triggered.",
+                "document_id": new_doc.id
+            }, status=201)
+
+        except DocumentUploadLink.DoesNotExist:
+            return Response({"error": "Invalid upload link."}, status=404)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+class ListUploadLinksView(APIView):
+    """Internal API: Lists all generated upload links for the admin dashboard."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        links = DocumentUploadLink.objects.select_related('document_type').all().order_by('-created_at')
+        data = []
+        for item in links:
+            data.append({
+                "id": str(item.id),
+                "document_type_name": item.document_type.type_name,
+                "workflow_id": item.workflow_id,
+                "is_revoked": item.is_revoked,
+                "is_valid": item.is_valid(),
+                "created_at": item.created_at.strftime("%Y-%m-%d %H:%M"),
+                "expires_at": item.expires_at.strftime("%Y-%m-%d %H:%M"),
+                "url": f"http://localhost:5173/external-upload/{item.id}"
+            })
+        return Response(data, status=200)
+
+        
