@@ -198,6 +198,34 @@ class DocumentTypeDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = DocumentType.objects.all()
     serializer_class = DocumentTypeSerializer
 
+class FolderMappingDetailView(APIView):
+    """API for updating or deleting a specific Google Drive Folder Mapping."""
+    permission_classes = [AllowAny]
+
+    def patch(self, request, pk):
+        try:
+            mapping = GDriveFolderMapping.objects.get(id=pk)
+            is_active = request.data.get('is_active')
+            
+            if is_active is not None:
+                mapping.is_active = is_active
+                mapping.save()
+                return Response({"message": "Pipeline status updated."}, status=200)
+                
+            return Response({"error": "Missing is_active status."}, status=400)
+            
+        except GDriveFolderMapping.DoesNotExist:
+            return Response({"error": "Mapping not found."}, status=404)
+
+    def delete(self, request, pk):
+        try:
+            mapping = GDriveFolderMapping.objects.get(id=pk)
+            mapping.delete()
+            return Response({"message": "Pipeline successfully deleted."}, status=200)
+        except GDriveFolderMapping.DoesNotExist:
+            return Response({"error": "Mapping not found."}, status=404)
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_upload_dropdowns(request):
@@ -370,4 +398,4 @@ class ListUploadLinksView(APIView):
             })
         return Response(data, status=200)
 
-        
+    
