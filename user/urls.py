@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import GetAllPermissionsView, SaveRoleView, GetAllRolesView, CreateUserView, CreateDepartmentView, \
     GetDepartmentsView, UpdateUserView, GetUsersView, DeleteUserView, UpdateRoleView, DeleteRoleView, \
-    UpdateDepartmentView, DeleteDepartmentView
+    UpdateDepartmentView, DeleteDepartmentView, LoginView, LogoutView, MeView
 
 urlpatterns = [
     path('permission/getAll/', GetAllPermissionsView.as_view(), name='get-permissions'),
@@ -16,5 +16,8 @@ urlpatterns = [
     path('user/save/',CreateUserView.as_view(),name='save-user'),
     path('user/update/<pk>/',UpdateUserView.as_view(),name='update-user'),
     path('user/getAll/',GetUsersView.as_view(),name='get-user'),
-    path('user/delete/<uuid:pk>/',DeleteUserView.as_view(),name='delete-user')
+    path('user/delete/<uuid:pk>/',DeleteUserView.as_view(),name='delete-user'),
+    path('login/', LoginView.as_view(), name='login'),
+    path('logout/', LogoutView.as_view(), name='logout'),
+    path('me/', MeView.as_view(), name='me'),
 ]

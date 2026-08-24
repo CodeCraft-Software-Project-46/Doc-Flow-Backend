@@ -8,7 +8,8 @@ from rest_framework import status
 from .serializers import UserSerializer, PermissionSerializer, RoleListSerializer, RoleSerializer, DepartmentSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
-
+from django.contrib.auth import authenticate, login as django_login, logout as django_logout
+from .models import User as CustomUser
 from .models import Role, Permission, User, Department
 from .utils import send_user_credentials
 from django.apps import apps
@@ -239,3 +240,88 @@ class DeleteDepartmentView(APIView):
 
 
 
+class LoginView(APIView):
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+
+        if not username or not password:
+            return Response({"error": "Username and password are required."}, status=400)
+
+        # 1. Authenticate against Django's auth_user table
+        auth_user = authenticate(request, username=username, password=password)
+
+        if auth_user is None:
+            return Response({"error": "Invalid username or password."}, status=401)
+
+        if not auth_user.is_active:
+            return Response({"error": "This account has been deactivated."}, status=403)
+
+        # 2. Fetch role/department/permission data from custom User table
+        try:
+            custom_user = CustomUser.objects.select_related('role', 'role__department').get(
+                username=auth_user.username
+            )
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User profile not found."}, status=404)
+
+        # 3. Create session (server-side, cookie-based)
+        django_login(request, auth_user)
+
+        # 4. Build response with role + permissions
+        role_data = None
+        if custom_user.role:
+            role_data = {
+                "id": str(custom_user.role.id),
+                "name": custom_user.role.name,
+                "department": custom_user.role.department.name if custom_user.role.department else None,
+                "permissions": list(
+                    custom_user.role.permissions.values_list("permission_name", flat=True)
+                ),
+            }
+
+        return Response({
+            "id": str(custom_user.id),
+            "username": auth_user.username,
+            "name": custom_user.name,
+            "email": custom_user.email,
+            "role": role_data,
+        }, status=200)
+
+
+class LogoutView(APIView):
+    def post(self, request):
+        django_logout(request)
+        return Response({"message": "Logged out successfully."}, status=200)
+
+
+class MeView(APIView):
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return Response({"error": "Not authenticated."}, status=401)
+
+        try:
+            custom_user = CustomUser.objects.select_related('role', 'role__department').get(
+                username=request.user.username
+            )
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User profile not found."}, status=404)
+
+        role_data = None
+        if custom_user.role:
+            role_data = {
+                "id": str(custom_user.role.id),
+                "name": custom_user.role.name,
+                "department": custom_user.role.department.name if custom_user.role.department else None,
+                "permissions": list(
+                    custom_user.role.permissions.values_list("permission_name", flat=True)
+                ),
+            }
+
+        return Response({
+            "id": str(custom_user.id),
+            "username": request.user.username,
+            "name": custom_user.name,
+            "email": custom_user.email,
+            "role": role_data,
+        }, status=200)
