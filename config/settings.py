@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
+import socket
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -41,9 +43,16 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
+    'corsheaders',
+    'working_hours',
+    'chatbot',
+    'analytics',
+    'sla',
+    "django_celery_beat",
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -77,20 +86,41 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'docflow',
-        'USER': 'admin',
-        'PASSWORD': 'WRNKb8jj7SZYYSVoOsUG',
-        'HOST': 'docflow.cxqy4m62kusu.eu-north-1.rds.amazonaws.com',
-        'PORT': '3306',
-        'OPTIONS': {
-            'sql_mode': 'STRICT_TRANS_TABLES',
-            'connect_timeout': 10,
+USE_SQLITE = os.environ.get('DOCFLOW_USE_SQLITE', '').lower() in {'1', 'true', 'yes'}
+
+DEFAULT_DB_HOST = 'docflow.cxqy4m62kusu.eu-north-1.rds.amazonaws.com'
+DB_HOST = os.environ.get('DB_HOST', DEFAULT_DB_HOST)
+if DB_HOST == DEFAULT_DB_HOST:
+    try:
+        # Resolve once at startup to avoid per-request DNS lookup failures.
+        DB_HOST = socket.gethostbyname(DEFAULT_DB_HOST)
+    except socket.gaierror:
+        # Known A record fallback for local dev when DNS is unstable.
+        DB_HOST = os.environ.get('DB_HOST_FALLBACK_IP', '13.62.179.132')
+
+if USE_SQLITE:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.environ.get('DB_NAME', 'docflow'),
+            'USER': os.environ.get('DB_USER', 'admin'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', 'WRNKb8jj7SZYYSVoOsUG'),
+            'HOST': DB_HOST,
+            'PORT': os.environ.get('DB_PORT', '3306'),
+            'CONN_MAX_AGE': 300,
+            'OPTIONS': {
+                'sql_mode': 'STRICT_TRANS_TABLES',
+                'connect_timeout': 10,
+            },
         },
-    },
-}
+    }
 
 
 # Password validation
@@ -144,10 +174,68 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
 }
 
-# --- CORS SETTINGS ---
+# CORS Configuration - Allow frontend to communicate with backend
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",    # Standard Vite port
+    "http://127.0.0.1:4173",
+    "http://localhost:4173",
     "http://127.0.0.1:5173",
-    "http://localhost:3000",    # Just in case you are on port 3000
+    "http://localhost:5173",
+    "http://127.0.0.1:5174",
+    "http://localhost:5174",
     "http://127.0.0.1:3000",
+    "http://localhost:3000",
+    "http://0.0.0.0:4173",
+    "http://0.0.0.0:5173",
 ]
+
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1:4173",
+    "http://localhost:4173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "http://127.0.0.1:5174",
+    "http://localhost:5174",
+]
+
+# ============================================================
+# CELERY CONFIGURATION
+# ============================================================
+
+CELERY_BROKER_URL = os.environ.get(
+    "CELERY_BROKER_URL",
+    "redis://127.0.0.1:6379/0",
+)
+
+CELERY_RESULT_BACKEND = os.environ.get(
+    "CELERY_RESULT_BACKEND",
+    "redis://127.0.0.1:6379/0",
+)
+
+CELERY_ACCEPT_CONTENT = ["json"]
+
+CELERY_TASK_SERIALIZER = "json"
+
+CELERY_RESULT_SERIALIZER = "json"
+
+CELERY_TIMEZONE = TIME_ZONE
+
+CELERY_ENABLE_UTC = True
+
+CELERY_TASK_TRACK_STARTED = True
+
+CELERY_TASK_TIME_LIMIT = 300
+
+CELERY_TASK_SOFT_TIME_LIMIT = 240
+
+
+# ============================================================
+# CELERY BEAT CONFIGURATION
+# ============================================================
+
+CELERY_BEAT_SCHEDULE = {
+    "reconcile-sla-tasks-every-minute": {
+        "task": "sla.tasks.reconcile_sla_tasks",
+        "schedule": 60.0,
+    },
+}

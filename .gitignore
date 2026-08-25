@@ -16,9 +16,24 @@ staticfiles/
 
 # Environment variables
 .env
+.env.*
+!.env.example
 
 # Logs
 *.log
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Type checker / linter caches
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter / notebook checkpoints
+.ipynb_checkpoints/
 
 # IDE
 .vscode/
@@ -32,9 +47,11 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+pip-wheel-metadata/
 
 # Migrations cache (optional)
 **/__pycache__/
 
 # PyCharm
 *.iml
+temp.py
