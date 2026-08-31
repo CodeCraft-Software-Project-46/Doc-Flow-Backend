@@ -26,18 +26,11 @@ Including another URLconf
 #When someone calls this URL → run this function
 #“List of routes Django can handle”
 from django.contrib import admin
-from django.http import HttpResponse
 from django.urls import path, include
 
-
-def home(request):
-    return HttpResponse(
-        "DocFlow API is running. Available endpoints: /admin/, /api/working-hours/, /api/chatbot/, /api/analytics/",
-        content_type="text/plain",
-    )
-
-
 urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/user/', include('user.urls')),
     path('', home, name='home'),
     path('admin/', admin.site.urls), #Django admin dashboard
     path('api/working-hours/', include('working_hours.urls')), #working_hours app

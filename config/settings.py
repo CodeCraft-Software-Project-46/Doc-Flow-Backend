@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'rest_framework',
+    'user'
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
@@ -50,6 +51,7 @@ INSTALLED_APPS = [
     'sla',
     "django_celery_beat",
 ]
+AUTH_USER_MODEL = 'user.User'
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
